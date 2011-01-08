@@ -1,5 +1,6 @@
 package net.peterd.soundswap;
 
+import java.io.File;
 import java.io.IOException;
 
 import android.app.Activity;
@@ -13,6 +14,8 @@ import android.location.LocationManager;
 import android.media.MediaRecorder;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Log;
+import android.widget.TextView;
 
 import com.google.android.maps.GeoPoint;
 
@@ -20,6 +23,8 @@ public class RecordActivity extends Activity implements LocationListener {
 
   ProgressDialog mWaitingForLocationDialog;
   LocationManager mLocationManager;
+
+  private static final double RECORD_DURATION_SECS = 2;
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
@@ -63,17 +68,24 @@ public class RecordActivity extends Activity implements LocationListener {
       return;
     }
 
-    mLocationManager.requestLocationUpdates(bestProvider, 1, 1, this);
+    Location location = mLocationManager.getLastKnownLocation(bestProvider);
+    if (location == null) {
+      mLocationManager.requestLocationUpdates(bestProvider, 0, 0, this);
+      Log.i("MOO", "requested location updates.");
 
-    mWaitingForLocationDialog =
+      mWaitingForLocationDialog =
         ProgressDialog.show(this, null, getString(R.string.waiting_for_location), true);
-    mWaitingForLocationDialog.setCancelable(true);
-    mWaitingForLocationDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-          @Override
-          public void onCancel(DialogInterface dialog) {
-            finish();
-          }
-        });
+      mWaitingForLocationDialog.setCancelable(true);
+      mWaitingForLocationDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+        @Override
+        public void onCancel(DialogInterface dialog) {
+          finish();
+        }
+      });
+    } else {
+      Log.i("MOO", "already had a location.");
+      onLocationChanged(location);
+    }
   }
 
   @Override
@@ -96,11 +108,14 @@ public class RecordActivity extends Activity implements LocationListener {
         (int) (location.getLongitude() * 1E6));
 
     MediaRecorder recorder = new MediaRecorder();
-    recorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
-    recorder.setOutputFormat(MediaRecorder.OutputFormat.DEFAULT);
+    recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+    recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
     recorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
-    recorder.setOutputFile(
-        Util.getFullFilename(this, System.currentTimeMillis(), point));
+
+    String outputFilename =
+        Util.getFullFilename(this, System.currentTimeMillis(), point);
+    recorder.setOutputFile(outputFilename);
+    Log.i("MOO", "recording to '" + outputFilename + "'.");
     try {
       recorder.prepare();
 
@@ -127,6 +142,11 @@ public class RecordActivity extends Activity implements LocationListener {
 
   @Override
   public void onLocationChanged(final Location location) {
+    Log.i("MOO", "received location.");
+
+    if (mWaitingForLocationDialog != null) {
+      mWaitingForLocationDialog.dismiss();
+    }
     mLocationManager.removeUpdates(this);
 
     final ProgressDialog progress = new ProgressDialog(this);
@@ -135,7 +155,7 @@ public class RecordActivity extends Activity implements LocationListener {
         new AsyncTask<Void, Integer, Boolean>() {
             @Override
             protected Boolean doInBackground(Void... params) {
-              return record(10.0, location);
+              return record(RECORD_DURATION_SECS, location);
             }
 
             @Override
@@ -146,6 +166,16 @@ public class RecordActivity extends Activity implements LocationListener {
             @Override
             protected void onPostExecute(Boolean success) {
               progress.dismiss();
+
+              TextView view = (TextView) findViewById(R.id.main_text_view);
+              File cacheDir = getCacheDir();
+              String[] files = cacheDir.list();
+
+              StringBuilder rep = new StringBuilder();
+              for (int i = 0; i < files.length; ++i) {
+                rep.append(files[i]).append("\n");
+              }
+              view.setText(rep);
             }
           };
 

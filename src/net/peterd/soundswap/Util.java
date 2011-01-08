@@ -16,7 +16,7 @@ public class Util {
 
     String filename = getFilename(System.currentTimeMillis(), geoPoint);
     String fullFilename =
-        cacheDir.getAbsolutePath() + File.pathSeparator + filename;
+        cacheDir.getAbsolutePath() + "/" + filename;
     return fullFilename;
   }
 
@@ -25,6 +25,7 @@ public class Util {
     builder.append(timeMillis).append("_");
     builder.append(geoPoint.getLatitudeE6()).append("_");
     builder.append(geoPoint.getLongitudeE6());
+    builder.append(".mp4");
     return builder.toString();
   }
 }
