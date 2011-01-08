@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="hello">Hello World, RecordActivity!</string>
     <string name="app_name">SoundSwap</string>
+
+    <string name="disappointed_but_okay">Aw Shucks</string>
+    <string name="location_device_error">No location provider</string>
+    <string name="waiting_for_location">Waiting for location...</string>
+    <string name="recording">Recording...</string>
 </resources>
