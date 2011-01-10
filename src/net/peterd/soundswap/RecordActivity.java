@@ -113,7 +113,7 @@ public class RecordActivity extends Activity implements LocationListener {
     try {
       mTempAudioFile = File.createTempFile("audio",
           "." + Util.FILE_EXTENSION,
-          getCacheDir());
+          Util.getFileDirectory());
     } catch (IOException e1) {
       Log.e("MOO", "Failed to create temporary file.", e1);
       return false;
