@@ -12,13 +12,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".ReviewActivity" android:label="ReviewActivity" />
 
         <uses-library android:name="com.google.android.maps" />
     </application>
 
     <uses-sdk android:minSdkVersion="3" />
 
-    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 </manifest> 

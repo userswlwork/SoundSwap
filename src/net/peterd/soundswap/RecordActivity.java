@@ -7,15 +7,16 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.media.MediaRecorder;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.TextView;
+import android.view.View;
+import android.widget.Button;
 
 import com.google.android.maps.GeoPoint;
 
@@ -24,12 +25,24 @@ public class RecordActivity extends Activity implements LocationListener {
   ProgressDialog mWaitingForLocationDialog;
   LocationManager mLocationManager;
 
-  private static final double RECORD_DURATION_SECS = 2;
+  private Location mLatestLocation;
+
+  private MediaRecorder mRecorder;
+  private File mTempAudioFile;
+  private long mTempAudioFileStartTimeMs;
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
-    setContentView(R.layout.main);
+    setContentView(R.layout.record);
+
+    final Button startRecording = (Button) findViewById(R.id.record_start);
+    startRecording.setOnClickListener(new View.OnClickListener() {
+          @Override
+          public void onClick(View v) {
+            startRecording();
+          }
+        });
   }
 
   @Override
@@ -68,24 +81,14 @@ public class RecordActivity extends Activity implements LocationListener {
       return;
     }
 
+    // Get the latest location
     Location location = mLocationManager.getLastKnownLocation(bestProvider);
-    if (location == null) {
-      mLocationManager.requestLocationUpdates(bestProvider, 0, 0, this);
-      Log.i("MOO", "requested location updates.");
-
-      mWaitingForLocationDialog =
-        ProgressDialog.show(this, null, getString(R.string.waiting_for_location), true);
-      mWaitingForLocationDialog.setCancelable(true);
-      mWaitingForLocationDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-        @Override
-        public void onCancel(DialogInterface dialog) {
-          finish();
-        }
-      });
-    } else {
-      Log.i("MOO", "already had a location.");
+    if (location != null) {
       onLocationChanged(location);
     }
+
+    // Start getting newer locations
+    mLocationManager.requestLocationUpdates(bestProvider, 0, 0, this);
   }
 
   @Override
@@ -95,103 +98,129 @@ public class RecordActivity extends Activity implements LocationListener {
   }
 
   /**
-   * Record audio to a temporary file for a certain amount of time, associated
-   * with a location.
+   * Begin recording audio to a temporary file for a certain amount of time,
+   * associated with a location.
    *
-   * @param lengthSecs the amount of time to record, in seconds
-   * @param location the location that's being recorded
-   * @return {@code true} if the recording completed successfully, {@code false}
+   * @return {@code true} if the recording started successfully, {@code false}
    *         otherwise
    */
-  private boolean record(double lengthSecs, Location location) {
-    GeoPoint point = new GeoPoint((int) (location.getLatitude() * 1E6),
-        (int) (location.getLongitude() * 1E6));
+  private boolean startRecording() {
+    mRecorder = new MediaRecorder();
+    mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+    mRecorder.setOutputFormat(Util.FILE_TYPE);
+    mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
 
-    MediaRecorder recorder = new MediaRecorder();
-    recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-    recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-    recorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
-
-    String outputFilename =
-        Util.getFullFilename(this, System.currentTimeMillis(), point);
-    recorder.setOutputFile(outputFilename);
-    Log.i("MOO", "recording to '" + outputFilename + "'.");
     try {
-      recorder.prepare();
+      mTempAudioFile = File.createTempFile("audio",
+          "." + Util.FILE_EXTENSION,
+          getCacheDir());
+    } catch (IOException e1) {
+      Log.e("MOO", "Failed to create temporary file.", e1);
+      return false;
+    }
 
-      recorder.start();
+    String outputFilename = mTempAudioFile.getAbsolutePath();
+    mRecorder.setOutputFile(outputFilename);
+    Log.i("MOO", "recording to '" + outputFilename + "'.");
 
-      Thread.sleep((long) (lengthSecs * 1000));
+    ProgressDialog recordingDialog = new ProgressDialog(this);
+    recordingDialog.setCancelable(false);
+    recordingDialog.setMessage(getString(R.string.recording));
+    recordingDialog.setButton(getString(R.string.record_stop),
+        new DialogInterface.OnClickListener() {
+          @Override
+          public void onClick(DialogInterface dialog, int which) {
+            stopRecording();
+          }
+        });
 
-      recorder.stop();
-      recorder.reset();   // You can reuse the object by going back to setAudioSource() step
-      recorder.release(); // Now the object cannot be reused
-
+    try {
+      mRecorder.prepare();
+      mRecorder.start();
+      mTempAudioFileStartTimeMs = System.currentTimeMillis();
+      recordingDialog.show();
       return true;
     } catch (IllegalStateException e) {
-      // TODO:handle error and display message to user
-      e.printStackTrace();
+      // Will never happen
     } catch (IOException e) {
-      // TODO: handle error and display message to user
-      e.printStackTrace();
-    } catch (InterruptedException e) {
-      // Meh.
+      throw new RuntimeException(e);
     }
     return false;
   }
 
-  @Override
-  public void onLocationChanged(final Location location) {
-    Log.i("MOO", "received location.");
+  /**
+   * Stop the current recording, and move the temporary file to one that has
+   * encoded the time, and location.
+   */
+  private void stopRecording() {
+    if (mRecorder == null) {
+      throw new IllegalStateException("Haven't started recording yet.");
+    }
 
+    mRecorder.stop();
+    mRecorder.reset();   // You can reuse the object by going back to setAudioSource() step
+    mRecorder.release(); // Now the object cannot be reused
+    mRecorder = null;
+
+    if (mLatestLocation == null) {
+      mWaitingForLocationDialog = new ProgressDialog(this);
+      mWaitingForLocationDialog.setCancelable(true);
+      mWaitingForLocationDialog.setOnCancelListener(
+          new DialogInterface.OnCancelListener() {
+                @Override
+                public void onCancel(DialogInterface dialog) {
+                  deleteTempFile();
+                }
+              });
+      mWaitingForLocationDialog.setMessage(
+          getString(R.string.waiting_for_location));
+      mWaitingForLocationDialog.show();
+    } else {
+      renameTempFile();
+    }
+  }
+
+  private void deleteTempFile() {
+    mTempAudioFile.delete();
+  }
+
+  /**
+   * Rename the temporary audio file and switch to the "review and send"
+   * Activity.
+   */
+  private void renameTempFile() {
+    if (mLatestLocation == null) {
+      throw new IllegalStateException("Trying to rename temp file without a " +
+          "location.");
+    }
+
+    GeoPoint point = new GeoPoint((int) (mLatestLocation.getLatitude() * 1E6),
+        (int) (mLatestLocation.getLongitude() * 1E6));
+
+    String finalFilename =
+      Util.getFullFilename(this, mTempAudioFileStartTimeMs, point);
+    Log.i("MOO", "Renaming '" + mTempAudioFile.getAbsolutePath() + "' to '" +
+        finalFilename + "'.");
+    boolean renamed = mTempAudioFile.renameTo(new File(finalFilename));
+    if (!renamed) {
+      throw new IllegalStateException("Could not rename file from '" +
+          mTempAudioFile.getAbsolutePath() + "' to '" + finalFilename + "'.");
+    }
+
+    Intent reviewIntent = new Intent(this, ReviewActivity.class);
+    reviewIntent.putExtra(ReviewActivity.FILENAME_EXTRA, finalFilename);
+    startActivity(reviewIntent);
+    finish();
+  }
+
+  @Override
+  public void onLocationChanged(Location location) {
+    mLatestLocation = location;
     if (mWaitingForLocationDialog != null) {
       mWaitingForLocationDialog.dismiss();
+      mWaitingForLocationDialog = null;
+      renameTempFile();
     }
-    mLocationManager.removeUpdates(this);
-
-    final ProgressDialog progress = new ProgressDialog(this);
-
-    final AsyncTask<Void, Integer, Boolean> task =
-        new AsyncTask<Void, Integer, Boolean>() {
-            @Override
-            protected Boolean doInBackground(Void... params) {
-              return record(RECORD_DURATION_SECS, location);
-            }
-
-            @Override
-            protected void onProgressUpdate(Integer... progress) {
-              // Nothing to see here.
-            }
-
-            @Override
-            protected void onPostExecute(Boolean success) {
-              progress.dismiss();
-
-              TextView view = (TextView) findViewById(R.id.main_text_view);
-              File cacheDir = getCacheDir();
-              String[] files = cacheDir.list();
-
-              StringBuilder rep = new StringBuilder();
-              for (int i = 0; i < files.length; ++i) {
-                rep.append(files[i]).append("\n");
-              }
-              view.setText(rep);
-            }
-          };
-
-    progress.setCancelable(true);
-    progress.setOnCancelListener(new DialogInterface.OnCancelListener() {
-
-          @Override
-          public void onCancel(DialogInterface dialog) {
-            task.cancel(true);
-          }
-        });
-    progress.setIndeterminate(true);
-    progress.setMessage(getString(R.string.recording));
-    progress.show();
-
-    task.execute();
   }
 
   @Override

@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SoundSwap</string>
+    
+    <string name="record_start">Start Recording</string>
+    <string name="record_stop">Stop Recording</string>
+    <string name="record_retry">Delete and Retry</string>
+    
+    <string name="play">Play</string>
+    <string name="error_playing">Error Playing</string>
 
     <string name="disappointed_but_okay">Aw Shucks</string>
     <string name="location_device_error">No location provider</string>
