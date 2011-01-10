@@ -28,8 +28,6 @@ public class Util {
       long timeMillis,
       GeoPoint geoPoint) {
     File cacheDir = getFilesDir();
-    cacheDir.mkdirs();
-
     String filename = getFilename(System.currentTimeMillis(), geoPoint);
     String fullFilename =
         cacheDir.getAbsolutePath() + "/" + filename;
