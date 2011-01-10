@@ -4,20 +4,26 @@ import java.io.File;
 
 import android.content.Context;
 import android.media.MediaRecorder;
+import android.os.Environment;
 
 import com.google.android.maps.GeoPoint;
 
 public class Util {
 
-  public static final String FILE_EXTENSION = "3gpp";
-  public static final int FILE_TYPE = MediaRecorder.OutputFormat.THREE_GPP;
+  public static final String FILE_EXTENSION = "mp4";
+  public static final int FILE_TYPE = MediaRecorder.OutputFormat.MPEG_4;
+
+  public static File getFileDirectory() {
+    File extDir = Environment.getExternalStorageDirectory();
+    File fileDir = new File(extDir + "/SoundSwap");
+    fileDir.mkdirs();
+    return fileDir;
+  }
 
   public static String getFullFilename(Context context,
       long timeMillis,
       GeoPoint geoPoint) {
-    File cacheDir = context.getCacheDir();
-    cacheDir.mkdirs();
-
+    File cacheDir = getFileDirectory();
     String filename = getFilename(System.currentTimeMillis(), geoPoint);
     String fullFilename =
         cacheDir.getAbsolutePath() + "/" + filename;
