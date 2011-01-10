@@ -1,7 +1,13 @@
 package net.peterd.soundswap;
 
+import java.io.BufferedOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -12,6 +18,7 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.util.Log;
@@ -27,7 +34,8 @@ public class RecordActivity extends Activity implements LocationListener {
 
   private Location mLatestLocation;
 
-  private MediaRecorder mRecorder;
+  private Recorder mRecorder;
+  private Thread mRecorderThread;
   private File mTempAudioFile;
   private long mTempAudioFileStartTimeMs;
 
@@ -105,23 +113,17 @@ public class RecordActivity extends Activity implements LocationListener {
    *         otherwise
    */
   private boolean startRecording() {
-    mRecorder = new MediaRecorder();
-    mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-    mRecorder.setOutputFormat(Util.FILE_TYPE);
-    mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-
     try {
       mTempAudioFile = File.createTempFile("audio",
-          "." + Util.FILE_EXTENSION,
-          getCacheDir());
+          "." + Util.RECORDING_FILE_EXTENSION,
+          Util.getFilesDir());
     } catch (IOException e1) {
       Log.e("MOO", "Failed to create temporary file.", e1);
       return false;
     }
 
-    String outputFilename = mTempAudioFile.getAbsolutePath();
-    mRecorder.setOutputFile(outputFilename);
-    Log.i("MOO", "recording to '" + outputFilename + "'.");
+    mRecorder = new Recorder(mTempAudioFile);
+    mRecorderThread = new Thread(mRecorder);
 
     ProgressDialog recordingDialog = new ProgressDialog(this);
     recordingDialog.setCancelable(false);
@@ -134,18 +136,68 @@ public class RecordActivity extends Activity implements LocationListener {
           }
         });
 
-    try {
-      mRecorder.prepare();
-      mRecorder.start();
-      mTempAudioFileStartTimeMs = System.currentTimeMillis();
-      recordingDialog.show();
-      return true;
-    } catch (IllegalStateException e) {
-      // Will never happen
-    } catch (IOException e) {
-      throw new RuntimeException(e);
+    mTempAudioFileStartTimeMs = System.currentTimeMillis();
+    mRecorderThread.start();
+    recordingDialog.show();
+    return true;
+  }
+
+  private static class Recorder implements Runnable {
+
+    private final AtomicBoolean mIsRecording = new AtomicBoolean(false);
+    private final File mOutputFile;
+
+    public Recorder(File outputFile) {
+      mOutputFile = outputFile;
     }
-    return false;
+
+    @Override
+    public void run() {
+      try {
+        OutputStream os = new FileOutputStream(mOutputFile);
+        BufferedOutputStream bos = new BufferedOutputStream(os);
+        DataOutputStream dos = new DataOutputStream(bos);
+
+        int bufferSize = AudioRecord.getMinBufferSize(Util.RECORDING_SAMPLE_RATE,
+            Util.RECORDING_CHANNEL,
+            Util.RECORDING_ENCODING);
+        Log.i("MOO", "Recording buffer size: " + bufferSize);
+
+        AudioRecord audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
+            Util.RECORDING_SAMPLE_RATE,
+            Util.RECORDING_CHANNEL,
+            Util.RECORDING_ENCODING,
+            bufferSize);
+
+        short[] buffer = new short[bufferSize];
+        audioRecord.startRecording();
+
+        while (mIsRecording.get()) {
+          int bufferReadResult = audioRecord.read(buffer, 0, bufferSize);
+          for (int i = 0; i < bufferReadResult; i++) {
+            try {
+              dos.writeShort(buffer[i]);
+            } catch (IOException e) {
+              Log.e("MOO", "Could not write to output stream.");
+            }
+          }
+        }
+
+        audioRecord.stop();
+        try {
+          dos.close();
+        } catch (IOException e) {
+          Log.e("MOO", "Could not close output file.");
+        }
+      } catch (FileNotFoundException e) {
+        // Won't happen; we created the file just now.
+        throw new RuntimeException(e);
+      }
+    }
+
+    public void stopRecording() {
+      mIsRecording.set(false);
+    }
   }
 
   /**
@@ -157,9 +209,12 @@ public class RecordActivity extends Activity implements LocationListener {
       throw new IllegalStateException("Haven't started recording yet.");
     }
 
-    mRecorder.stop();
-    mRecorder.reset();   // You can reuse the object by going back to setAudioSource() step
-    mRecorder.release(); // Now the object cannot be reused
+    mRecorder.stopRecording();
+    try {
+      mRecorderThread.join();
+    } catch (InterruptedException e) {
+      // Meh.
+    }
     mRecorder = null;
 
     if (mLatestLocation == null) {

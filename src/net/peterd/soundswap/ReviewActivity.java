@@ -1,14 +1,19 @@
 package net.peterd.soundswap;
 
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
 import java.io.File;
-import java.io.IOException;
+import java.io.FileInputStream;
+import java.io.InputStream;
 
 import android.app.Activity;
-import android.app.AlertDialog;
+import android.app.Dialog;
 import android.app.ProgressDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.media.MediaPlayer;
+import android.media.AudioFormat;
+import android.media.AudioManager;
+import android.media.AudioRecord;
+import android.media.AudioTrack;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -66,67 +71,78 @@ public class ReviewActivity extends Activity {
   }
 
   private boolean play() {
-    String fileName = mRecordedFile.getAbsolutePath();
-
-    final MediaPlayer player = new MediaPlayer();
-
-    final ProgressDialog playingDialog = new ProgressDialog(this);
-    playingDialog.setCancelable(true);
-    playingDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-          @Override
-          public void onCancel(DialogInterface dialog) {
-            player.stop();
-          }
-        });
-
-    MediaPlayer.OnCompletionListener finishedPlayingListener =
-        new MediaPlayer.OnCompletionListener() {
-              @Override
-              public void onCompletion(MediaPlayer mp) {
-                playingDialog.dismiss();
-                mp.reset();
-                mp.release();
-              }
-            };
-    player.setOnCompletionListener(finishedPlayingListener);
-
-    player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-          @Override
-          public boolean onError(MediaPlayer mp, int what, int extra) {
-            new AlertDialog.Builder(ReviewActivity.this)
-                .setCancelable(true)
-                .setMessage(R.string.error_playing)
-                .show();
-            return false;
-          }
-        });
-
-    try {
-      player.setDataSource(fileName);
-    } catch (IllegalArgumentException e) {
-      throw new RuntimeException(e);
-    } catch (IllegalStateException e) {
-      throw new RuntimeException(e);
-    } catch (IOException e) {
-      Log.e("MOO", "Failed to set datasource to file at location '" + fileName +
-          "'.");
-      return false;
-    }
-
-    try {
-      player.prepare();
-    } catch (IllegalStateException e) {
-      throw new RuntimeException(e);
-    } catch (IOException e) {
-      Log.e("MOO", "Failed to prepare to play file at location '" + fileName +
-          "'.");
-      return false;
-    }
-
-    player.start();
+    ProgressDialog playingDialog = new ProgressDialog(this);
     playingDialog.show();
 
+    Thread playingThread = new Thread(new Player(mRecordedFile, playingDialog));
+    playingThread.start();
+
     return true;
+  }
+
+  private static class Player implements Runnable {
+
+    private final File mAudioFile;
+    private final Dialog mPlayingDialog;
+
+    public Player(File audioFile, Dialog playingDialog) {
+      mAudioFile = audioFile;
+      mPlayingDialog = playingDialog;
+    }
+
+    @Override
+    public void run() {
+      Log.i("MOO", "Playing back file " + mAudioFile.getAbsolutePath());
+
+      // Get the length of the audio stored in the file (16 bit so 2 bytes per short)
+      // and create a short array to store the recorded audio.
+      assert Util.RECORDING_ENCODING == AudioFormat.ENCODING_PCM_16BIT;
+      assert mAudioFile.length() < Integer.MAX_VALUE;
+
+      try {
+        // Create a DataInputStream to read the audio data back from the saved file.
+        InputStream is = new FileInputStream(mAudioFile);
+        BufferedInputStream bis = new BufferedInputStream(is);
+        DataInputStream dis = new DataInputStream(bis);
+
+        // Close the input streams.
+        dis.close();
+
+        int bufferSize = AudioRecord.getMinBufferSize(Util.RECORDING_SAMPLE_RATE,
+            Util.RECORDING_CHANNEL,
+            Util.RECORDING_ENCODING);
+
+        // Create a new AudioTrack object using the same parameters as the AudioRecord
+        // object used to create the file.
+        AudioTrack audioTrack = new AudioTrack(AudioManager.STREAM_MUSIC,
+            Util.RECORDING_SAMPLE_RATE,
+            Util.RECORDING_CHANNEL,
+            Util.RECORDING_ENCODING,
+            bufferSize,
+            AudioTrack.MODE_STREAM);
+
+        // Start playback
+        audioTrack.play();
+
+        short[] audio = new short[bufferSize];
+
+        while (dis.available() > 0) {
+          // Read the file into the music array.
+          int i = 0;
+          while (dis.available() > 0 && i < bufferSize) {
+            audio[i] = dis.readShort();
+            i++;
+          }
+
+          // Write the music buffer to the AudioTrack object
+          audioTrack.write(audio, 0, i);
+        }
+
+      } catch (Throwable t) {
+        Log.e("AudioTrack", "Playback Failed", t);
+      }
+      mPlayingDialog.dismiss();
+    }
   }
 
   private void deleteAndRecord() {
