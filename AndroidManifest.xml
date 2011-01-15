@@ -13,6 +13,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".ReviewActivity" android:label="ReviewActivity" />
+        <activity android:name=".CompressActivity" android:label="CompressActivity" />
 
         <uses-library android:name="com.google.android.maps" />
     </application>
