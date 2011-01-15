@@ -133,6 +133,9 @@ public class CompressActivity extends Activity {
         return null;
       }
 
+      Log.i("MOO", "Compressing " + inputF.getAbsolutePath() + " to " +
+          outputF.getAbsolutePath());
+
       long inputSize = inputF.length();
       try {
         zos.putNextEntry(new ZipEntry(inputF.getName()));
@@ -167,6 +170,12 @@ public class CompressActivity extends Activity {
           return null;
         }
       }
+      Log.i("MOO", "Finished compressing " + inputF.getAbsolutePath() + " to " +
+          outputF.getAbsolutePath());
+      Log.i("MOO", "Size of " + inputF.getAbsolutePath() + " : " +
+          inputF.length());
+      Log.i("MOO", "Size of " + outputF.getAbsolutePath() + " : " +
+          outputF.length());
 
       return outputF;
     }
@@ -178,6 +187,11 @@ public class CompressActivity extends Activity {
             "Must be exactly one progress value.");
       }
       mDialog.setProgress((int) (10000 * progress[0]));
+    }
+
+    @Override
+    protected void onPostExecute(File file) {
+      mDialog.dismiss();
     }
   }
 }

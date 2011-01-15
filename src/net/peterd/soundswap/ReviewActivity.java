@@ -33,6 +33,14 @@ public class ReviewActivity extends Activity {
           }
         });
 
+    Button acceptButton = (Button) findViewById(R.id.accept);
+    acceptButton.setOnClickListener(new View.OnClickListener() {
+          @Override
+          public void onClick(View v) {
+            accept();
+          }
+        });
+
     Button retryButton = (Button) findViewById(R.id.record_retry);
     retryButton.setOnClickListener(new View.OnClickListener() {
           @Override
@@ -133,5 +141,12 @@ public class ReviewActivity extends Activity {
     mRecordedFile.delete();
     startActivity(new Intent(this, RecordActivity.class));
     finish();
+  }
+
+  private void accept() {
+    Intent intent = new Intent(this, CompressActivity.class);
+    intent.putExtra(CompressActivity.FILENAME_EXTRA,
+        mRecordedFile.getAbsolutePath());
+    startActivity(intent);
   }
 }
