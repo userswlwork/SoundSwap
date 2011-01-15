@@ -11,9 +11,8 @@ import com.google.android.maps.GeoPoint;
 public class Util {
 
   public static final String RECORDING_FILE_EXTENSION = "wav";
-  public static final int RECORDING_SAMPLE_RATE = 44100;
-  public static final int RECORDING_CHANNEL =
-      AudioFormat.CHANNEL_CONFIGURATION_MONO;
+  public static final int RECORDING_SAMPLE_RATE = 22050;
+  public static final int RECORDING_CHANNEL = AudioFormat.CHANNEL_CONFIGURATION_MONO;
   public static final int RECORDING_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
 
   public static File getFilesDir() {

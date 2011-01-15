@@ -1,12 +1,9 @@
 package net.peterd.soundswap;
 
-import java.io.BufferedOutputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import android.app.Activity;
@@ -18,9 +15,11 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.os.Bundle;
+import android.os.Process;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -144,7 +143,7 @@ public class RecordActivity extends Activity implements LocationListener {
 
   private static class Recorder implements Runnable {
 
-    private final AtomicBoolean mIsRecording = new AtomicBoolean(false);
+    private final AtomicBoolean mIsRecording = new AtomicBoolean(true);
     private final File mOutputFile;
 
     public Recorder(File outputFile) {
@@ -153,10 +152,33 @@ public class RecordActivity extends Activity implements LocationListener {
 
     @Override
     public void run() {
+      Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
+
       try {
-        OutputStream os = new FileOutputStream(mOutputFile);
-        BufferedOutputStream bos = new BufferedOutputStream(os);
-        DataOutputStream dos = new DataOutputStream(bos);
+        RandomAccessFile output = new RandomAccessFile(mOutputFile, "rw");
+
+        short bSamples = Util.RECORDING_ENCODING == AudioFormat.ENCODING_PCM_16BIT ? 16 : 8;
+
+        // Write file header.
+        try {
+          output.setLength(0); // Set file length to 0, to prevent unexpected behavior in case the file already existed
+          output.writeBytes("RIFF");
+          output.writeInt(0); // Final file size not known yet, write 0
+          output.writeBytes("WAVE");
+          output.writeBytes("fmt ");
+          output.writeInt(Integer.reverseBytes(16)); // Sub-chunk size, 16 for PCM
+          output.writeShort(Short.reverseBytes((short) 1)); // AudioFormat, 1 for PCM
+          output.writeShort(Short.reverseBytes((short) 1)); // Number of channels, 1 for mono
+          output.writeInt(Integer.reverseBytes(Util.RECORDING_SAMPLE_RATE)); // Sample rate
+          output.writeInt(Integer.reverseBytes(Util.RECORDING_SAMPLE_RATE*bSamples/8)); // Byte rate, SampleRate*NumberOfChannels*BitsPerSample/8
+          output.writeShort(Short.reverseBytes((short)(bSamples/8))); // Block align, NumberOfChannels*BitsPerSample/8
+          output.writeShort(Short.reverseBytes(bSamples)); // Bits per sample
+          output.writeBytes("data");
+          output.writeInt(0); // Data chunk size not known yet, write 0
+        } catch (IOException e) {
+          Log.e("MOO", "Failed to write wav file header.", e);
+          return;
+        }
 
         int bufferSize = AudioRecord.getMinBufferSize(Util.RECORDING_SAMPLE_RATE,
             Util.RECORDING_CHANNEL,
@@ -170,22 +192,46 @@ public class RecordActivity extends Activity implements LocationListener {
             bufferSize);
 
         short[] buffer = new short[bufferSize];
-        audioRecord.startRecording();
 
+        Log.i("MOO", "Starting recording.");
+        audioRecord.startRecording();
+        Log.i("MOO", "Started recording.");
+
+        int payloadSize = 0;
         while (mIsRecording.get()) {
           int bufferReadResult = audioRecord.read(buffer, 0, bufferSize);
+
+          if (bufferReadResult == AudioRecord.ERROR_INVALID_OPERATION) {
+            throw new IllegalStateException("Invalid audiorecord read " +
+                "operation.");
+          } else if (bufferReadResult == AudioRecord.ERROR_BAD_VALUE) {
+            throw new IllegalStateException("Audiorecord read " +
+                "bad value.");
+          }
+
           for (int i = 0; i < bufferReadResult; i++) {
             try {
-              dos.writeShort(buffer[i]);
+              output.writeShort(Short.reverseBytes(buffer[i]));
             } catch (IOException e) {
               Log.e("MOO", "Could not write to output stream.");
             }
           }
+
+          payloadSize += bufferReadResult * (bSamples / 8);
         }
 
+        Log.i("MOO", "Stopping recording.");
         audioRecord.stop();
+        Log.i("MOO", "Stopped recording.");
+
+        // Update wav file header and close it.
+
         try {
-          dos.close();
+          output.seek(4); // Write size to RIFF header
+          output.writeInt(Integer.reverseBytes(36+payloadSize));
+          output.seek(40); // Write size to Subchunk2Size field
+          output.writeInt(Integer.reverseBytes(payloadSize));
+          output.close();
         } catch (IOException e) {
           Log.e("MOO", "Could not close output file.");
         }
@@ -216,6 +262,8 @@ public class RecordActivity extends Activity implements LocationListener {
       // Meh.
     }
     mRecorder = null;
+
+    Log.i("MOO", "Stopped recording.  File has size " + mTempAudioFile.length());
 
     if (mLatestLocation == null) {
       mWaitingForLocationDialog = new ProgressDialog(this);
