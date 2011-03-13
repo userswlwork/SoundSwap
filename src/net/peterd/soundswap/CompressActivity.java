@@ -52,7 +52,7 @@ public class CompressActivity extends Activity {
     }
 
     ProgressDialog dialog = new ProgressDialog(this);
-    final Compressor compressor = new Compressor(dialog);
+    final Compressor compressor = new Compressor(this, dialog);
 
     dialog.setMessage(getString(R.string.compressing));
     dialog.setProgress(0);
@@ -82,10 +82,12 @@ public class CompressActivity extends Activity {
 
   private static class Compressor extends AsyncTask<File, Double, File> {
 
+    private final Activity mActivity;
     private final ProgressDialog mDialog;
     private final AtomicBoolean mCancel = new AtomicBoolean(false);
 
-    public Compressor(ProgressDialog dialog) {
+    public Compressor(Activity activity, ProgressDialog dialog) {
+      mActivity = activity;
       mDialog = dialog;
     }
 
@@ -192,6 +194,11 @@ public class CompressActivity extends Activity {
     @Override
     protected void onPostExecute(File file) {
       mDialog.dismiss();
+
+      Intent sendIntent = new Intent(mActivity, SendActivity.class);
+      sendIntent.putExtra(SendActivity.FILENAME_EXTRA, file.getAbsolutePath());
+      mActivity.startActivity(sendIntent);
+      mActivity.finish();
     }
   }
 }
