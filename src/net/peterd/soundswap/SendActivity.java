@@ -19,6 +19,7 @@ import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
@@ -89,7 +90,9 @@ public class SendActivity extends Activity {
     sender.execute(mCompressedFile);
   }
 
-  private static class Sender extends AsyncTask<File, Double, File> {
+  private static class Sender extends AsyncTask<File, Double, Uri> {
+
+    private static final String HEADER_LOCATION = "Location";
 
     private final ProgressDialog mDialog;
     private final AtomicBoolean mCancel = new AtomicBoolean(false);
@@ -104,7 +107,7 @@ public class SendActivity extends Activity {
     }
 
     @Override
-    protected File doInBackground(File... files) {
+    protected Uri doInBackground(File... files) {
       if (files.length != 1) {
         throw new IllegalArgumentException("Must specify exactly one file " +
             "to compress.");
@@ -132,13 +135,14 @@ public class SendActivity extends Activity {
             }
           });
 
+      Uri continueUri = null;
       try {
         // Get the upload redirect Uri.
         String uploadUri = null;
         try {
           HttpGet getUploadUrl = new HttpGet(FORM_REDIRECT_URL);
           HttpResponse response = client.execute(getUploadUrl);
-          Header[] headers = response.getHeaders("Location");
+          Header[] headers = response.getHeaders(HEADER_LOCATION);
           if (headers == null || headers.length != 1) {
             throw new IllegalStateException(
             "Did not return a redirect location.");
@@ -163,6 +167,13 @@ public class SendActivity extends Activity {
 
           Log.i("MOO", "Uploaded; response status line: " +
               response.getStatusLine());
+
+          Header[] headers = response.getHeaders(HEADER_LOCATION);
+          if (headers == null || headers.length != 1) {
+            throw new IllegalStateException(
+                "Did not return a redirect location.");
+          }
+          continueUri = Uri.parse(headers[0].getValue());
         } catch (Exception e) {
           Log.e("MOO", "Failed to upload file to server.", e);
           return null;
@@ -174,8 +185,7 @@ public class SendActivity extends Activity {
           // Meh
         }
       }
-
-      return inputF;
+      return continueUri;
     }
 
     @Override
@@ -188,7 +198,8 @@ public class SendActivity extends Activity {
     }
 
     @Override
-    protected void onPostExecute(File file) {
+    protected void onPostExecute(Uri continueUri) {
+      Log.i("MOO", "Got continue uri " + continueUri);
       mDialog.dismiss();
     }
   }
