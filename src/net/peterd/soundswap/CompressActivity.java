@@ -111,9 +111,10 @@ public class CompressActivity extends Activity {
 
       File outputF = new File(inputF.getAbsoluteFile() + ".zip");
       if (outputF.exists()) {
-        Log.e("MOO", "Output file already exists");
-        return null;
+        Log.w("MOO", "Output file already exists");
+        return outputF;
       }
+
       try {
         if (!outputF.createNewFile()) {
           Log.e("MOO", "Failed to create file " + outputF.getAbsolutePath());

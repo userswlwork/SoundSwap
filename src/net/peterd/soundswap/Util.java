@@ -2,11 +2,8 @@ package net.peterd.soundswap;
 
 import java.io.File;
 
-import android.content.Context;
 import android.media.AudioFormat;
 import android.os.Environment;
-
-import com.google.android.maps.GeoPoint;
 
 public class Util {
 
@@ -23,21 +20,24 @@ public class Util {
     return externalStorage;
   }
 
-  public static String getFullFilename(Context context,
-      long timeMillis,
-      GeoPoint geoPoint) {
+  public static String getFullFilename(long timeMillis,
+      int latitudeE6,
+      int longitudeE6) {
     File cacheDir = getFilesDir();
-    String filename = getFilename(System.currentTimeMillis(), geoPoint);
+    String filename =
+        getFilename(System.currentTimeMillis(), latitudeE6, longitudeE6);
     String fullFilename =
         cacheDir.getAbsolutePath() + "/" + filename;
     return fullFilename;
   }
 
-  private static String getFilename(long timeMillis, GeoPoint geoPoint) {
+  private static String getFilename(long timeMillis,
+      int latitudeE6,
+      int longitudeE6) {
     StringBuilder builder = new StringBuilder();
     builder.append(timeMillis).append("_");
-    builder.append(geoPoint.getLatitudeE6()).append("_");
-    builder.append(geoPoint.getLongitudeE6());
+    builder.append(latitudeE6).append("_");
+    builder.append(longitudeE6);
     builder.append(".").append(RECORDING_FILE_EXTENSION);
     return builder.toString();
   }

@@ -24,8 +24,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
-import com.google.android.maps.GeoPoint;
-
 public class RecordActivity extends Activity implements LocationListener {
 
   ProgressDialog mWaitingForLocationDialog;
@@ -297,11 +295,9 @@ public class RecordActivity extends Activity implements LocationListener {
           "location.");
     }
 
-    GeoPoint point = new GeoPoint((int) (mLatestLocation.getLatitude() * 1E6),
-        (int) (mLatestLocation.getLongitude() * 1E6));
-
-    String finalFilename =
-      Util.getFullFilename(this, mTempAudioFileStartTimeMs, point);
+    String finalFilename = Util.getFullFilename(mTempAudioFileStartTimeMs,
+            (int) (mLatestLocation.getLatitude() * 1E6),
+            (int) (mLatestLocation.getLongitude() * 1E6));
     Log.i("MOO", "Renaming '" + mTempAudioFile.getAbsolutePath() + "' to '" +
         finalFilename + "'.");
     boolean renamed = mTempAudioFile.renameTo(new File(finalFilename));

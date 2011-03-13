@@ -1,7 +1,19 @@
 package net.peterd.soundswap;
 
 import java.io.File;
+import java.net.URI;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.apache.http.Header;
+import org.apache.http.HttpResponse;
+import org.apache.http.ProtocolException;
+import org.apache.http.client.RedirectHandler;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.mime.MultipartEntity;
+import org.apache.http.entity.mime.content.FileBody;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.protocol.HttpContext;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
@@ -14,6 +26,9 @@ import android.util.Log;
 public class SendActivity extends Activity {
 
   public static final String FILENAME_EXTRA = "filename";
+
+  private static final String HOST = "http://10.1.10.12:8080";
+  public static final String FORM_REDIRECT_URL = HOST + "/upload/form_redirect";
 
   private File mCompressedFile;
 
@@ -101,7 +116,66 @@ public class SendActivity extends Activity {
             " does not exist.");
       }
 
-      return null;
+      DefaultHttpClient client = new DefaultHttpClient();
+      client.setRedirectHandler(new RedirectHandler() {
+            @Override
+            public boolean isRedirectRequested(HttpResponse response,
+                HttpContext context) {
+              // Disable following redirects
+              return false;
+            }
+
+            @Override
+            public URI getLocationURI(HttpResponse response,
+                HttpContext context) throws ProtocolException {
+              return null;
+            }
+          });
+
+      try {
+        // Get the upload redirect Uri.
+        String uploadUri = null;
+        try {
+          HttpGet getUploadUrl = new HttpGet(FORM_REDIRECT_URL);
+          HttpResponse response = client.execute(getUploadUrl);
+          Header[] headers = response.getHeaders("Location");
+          if (headers == null || headers.length != 1) {
+            throw new IllegalStateException(
+            "Did not return a redirect location.");
+          }
+          uploadUri = headers[0].getValue();
+          Log.i("MOO", "Got upload redirect location " + uploadUri);
+        } catch (Exception e) {
+          Log.e("MOO", "Failed to fetch redirect upload uri.", e);
+          return null;
+        }
+
+        // Upload the file.
+        try {
+          FileBody body = new FileBody(inputF);
+
+          MultipartEntity entity = new MultipartEntity();
+          entity.addPart("bin", body);
+
+          HttpPost postUpload = new HttpPost(uploadUri);
+          postUpload.setEntity(entity);
+          HttpResponse response = client.execute(postUpload);
+
+          Log.i("MOO", "Uploaded; response status line: " +
+              response.getStatusLine());
+        } catch (Exception e) {
+          Log.e("MOO", "Failed to upload file to server.", e);
+          return null;
+        }
+      } finally {
+        try {
+          client.getConnectionManager().shutdown();
+        } catch (Exception ignore) {
+          // Meh
+        }
+      }
+
+      return inputF;
     }
 
     @Override
