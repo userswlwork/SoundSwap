@@ -62,7 +62,7 @@ public class SendActivity extends Activity {
     }
 
     ProgressDialog dialog = new ProgressDialog(this);
-    final Sender sender = new Sender(dialog);
+    final Sender sender = new Sender(dialog, this);
 
     dialog.setMessage(getString(R.string.sending));
     dialog.setProgress(0);
@@ -90,15 +90,23 @@ public class SendActivity extends Activity {
     sender.execute(mCompressedFile);
   }
 
+  protected void onUploadSuccess(Uri continueUri) {
+    Intent intent = new Intent(this, FetchActivity.class);
+    intent.putExtra(FetchActivity.FETCH_URI_EXTRA, continueUri.toString());
+    startActivity(intent);
+  }
+
   private static class Sender extends AsyncTask<File, Double, Uri> {
 
     private static final String HEADER_LOCATION = "Location";
 
     private final ProgressDialog mDialog;
+    private final SendActivity mActivity;
     private final AtomicBoolean mCancel = new AtomicBoolean(false);
 
-    public Sender(ProgressDialog dialog) {
+    public Sender(ProgressDialog dialog, SendActivity activity) {
       mDialog = dialog;
+      mActivity = activity;
     }
 
     @Override
@@ -201,6 +209,7 @@ public class SendActivity extends Activity {
     protected void onPostExecute(Uri continueUri) {
       Log.i("MOO", "Got continue uri " + continueUri);
       mDialog.dismiss();
+      mActivity.onUploadSuccess(continueUri);
     }
   }
 }

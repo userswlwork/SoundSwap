@@ -6,6 +6,7 @@
       android:debuggable="true">
     <application android:icon="@drawable/icon" android:label="@string/app_name">
         <activity android:name=".CompressActivity" android:label="CompressActivity" />
+        <activity android:name=".FetchActivity" android:label="FetchActivity" />
         <activity android:name=".RecordActivity"
                   android:label="@string/app_name">
             <intent-filter>
