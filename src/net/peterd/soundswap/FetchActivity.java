@@ -1,6 +1,7 @@
 package net.peterd.soundswap;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -14,6 +15,7 @@ import org.apache.http.util.EntityUtils;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
@@ -69,12 +71,12 @@ public class FetchActivity extends Activity {
 
   private static class Fetcher extends AsyncTask<Uri, Double, File> {
 
-    private final Activity mActivity;
+    private final Context mContext;
     private final ProgressDialog mDialog;
     private final AtomicBoolean mCancel = new AtomicBoolean(false);
 
-    public Fetcher(Activity activity, ProgressDialog dialog) {
-      mActivity = activity;
+    public Fetcher(Context context, ProgressDialog dialog) {
+      mContext = context;
       mDialog = dialog;
     }
 
@@ -105,16 +107,22 @@ public class FetchActivity extends Activity {
             }
           };
 
+      File file = Util.getFetchedFilename(System.currentTimeMillis());
+
       try {
         HttpGet getSound = new HttpGet(inputUri.toString());
         byte[] response = client.execute(getSound, handler);
         Log.i("MOO", "Downloaded " + response.length + " bytes.");
+
+        FileOutputStream fos = new FileOutputStream(file);
+        fos.write(response);
+        fos.close();
       } catch (Exception e) {
         Log.e("MOO", "Failed to fetch sound.", e);
         return null;
       }
 
-      return null;
+      return file;
     }
 
     @Override
@@ -129,6 +137,7 @@ public class FetchActivity extends Activity {
     @Override
     protected void onPostExecute(File file) {
       mDialog.dismiss();
+      Util.play(mContext, file);
     }
   }
 }

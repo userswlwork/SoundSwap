@@ -113,7 +113,7 @@ public class RecordActivity extends Activity implements LocationListener {
     try {
       mTempAudioFile = File.createTempFile("audio",
           "." + Util.RECORDING_FILE_EXTENSION,
-          Util.getFilesDir());
+          Util.getFilesDir(Util.TEMP_DIR));
     } catch (IOException e1) {
       Log.e("MOO", "Failed to create temporary file.", e1);
       return false;
@@ -295,7 +295,7 @@ public class RecordActivity extends Activity implements LocationListener {
           "location.");
     }
 
-    String finalFilename = Util.getFullFilename(mTempAudioFileStartTimeMs,
+    String finalFilename = Util.getRecordedFile(mTempAudioFileStartTimeMs,
             (int) (mLatestLocation.getLatitude() * 1E6),
             (int) (mLatestLocation.getLongitude() * 1E6));
     Log.i("MOO", "Renaming '" + mTempAudioFile.getAbsolutePath() + "' to '" +

@@ -14,27 +14,32 @@ import android.util.Log;
 
 public class Util {
 
+  public static final String TEMP_DIR = "temp";
+  public static final String FETCHED_DIR = "fetched";
+  public static final String RECORDED_DIR = "recorded";
+
   public static final String RECORDING_FILE_EXTENSION = "wav";
   public static final int RECORDING_SAMPLE_RATE = 22050;
   public static final int RECORDING_CHANNEL = AudioFormat.CHANNEL_CONFIGURATION_MONO;
   public static final int RECORDING_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
 
-  public static File getFilesDir() {
+  public static File getFilesDir(String subDir) {
     File externalStorage = Environment.getExternalStorageDirectory();
     externalStorage =
-        new File(externalStorage.getAbsolutePath() + "/SoundSwap");
+        new File(externalStorage.getAbsolutePath() +
+            "/SoundSwap" +
+            "/" + subDir);
     externalStorage.mkdirs();
     return externalStorage;
   }
 
-  public static String getFullFilename(long timeMillis,
+  public static String getRecordedFile(long timeMillis,
       int latitudeE6,
       int longitudeE6) {
-    File cacheDir = getFilesDir();
+    File cacheDir = getFilesDir(RECORDED_DIR);
     String filename =
         getFilename(System.currentTimeMillis(), latitudeE6, longitudeE6);
-    String fullFilename =
-        cacheDir.getAbsolutePath() + "/" + filename;
+    String fullFilename = cacheDir.getAbsolutePath() + "/" + filename;
     return fullFilename;
   }
 
@@ -47,6 +52,16 @@ public class Util {
     builder.append(longitudeE6);
     builder.append(".").append(RECORDING_FILE_EXTENSION);
     return builder.toString();
+  }
+
+  public static File getFetchedFilename(long timeMillis) {
+    return new File(new StringBuilder()
+        .append(getFilesDir(FETCHED_DIR))
+        .append("/")
+        .append(timeMillis)
+        .append(".")
+        .append(RECORDING_FILE_EXTENSION)
+        .toString());
   }
 
   public static boolean play(final Context context, File file) {

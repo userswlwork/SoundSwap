@@ -75,8 +75,8 @@ public class ReviewActivity extends Activity {
   }
 
   private void accept() {
-    Intent intent = new Intent(this, CompressActivity.class);
-    intent.putExtra(CompressActivity.FILENAME_EXTRA,
+    Intent intent = new Intent(this, SendActivity.class);
+    intent.putExtra(SendActivity.FILENAME_EXTRA,
         mRecordedFile.getAbsolutePath());
     startActivity(intent);
   }
