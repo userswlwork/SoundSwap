@@ -15,7 +15,6 @@ import org.apache.http.util.EntityUtils;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
@@ -71,12 +70,12 @@ public class FetchActivity extends Activity {
 
   private static class Fetcher extends AsyncTask<Uri, Double, File> {
 
-    private final Context mContext;
+    private final Activity mActivity;
     private final ProgressDialog mDialog;
     private final AtomicBoolean mCancel = new AtomicBoolean(false);
 
-    public Fetcher(Context context, ProgressDialog dialog) {
-      mContext = context;
+    public Fetcher(Activity activity, ProgressDialog dialog) {
+      mActivity = activity;
       mDialog = dialog;
     }
 
@@ -137,7 +136,11 @@ public class FetchActivity extends Activity {
     @Override
     protected void onPostExecute(File file) {
       mDialog.dismiss();
-      Util.play(mContext, file);
+
+      Intent intent = new Intent(mActivity, PlayFetchedActivity.class);
+      intent.putExtra(PlayFetchedActivity.FILENAME_EXTRA,
+          file.getAbsolutePath());
+      mActivity.startActivity(intent);
     }
   }
 }

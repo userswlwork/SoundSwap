@@ -5,6 +5,7 @@
     <string name="record_start">Start Recording</string>
     <string name="record_stop">Stop Recording</string>
     <string name="record_retry">Delete and Retry</string>
+    <string name="record_new">Send Another</string>
     
     <string name="play">Play</string>
     <string name="error_playing">Error Playing</string>
