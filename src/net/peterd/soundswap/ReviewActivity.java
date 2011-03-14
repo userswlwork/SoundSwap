@@ -1,14 +1,9 @@
 package net.peterd.soundswap;
 
 import java.io.File;
-import java.io.IOException;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.app.ProgressDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -29,7 +24,7 @@ public class ReviewActivity extends Activity {
     playButton.setOnClickListener(new View.OnClickListener() {
           @Override
           public void onClick(View v) {
-            play();
+            Util.play(ReviewActivity.this, mRecordedFile);
           }
         });
 
@@ -71,70 +66,6 @@ public class ReviewActivity extends Activity {
       Log.i("MOO", "Recorded file '" + filename + "' exists and has length " +
           fileLength);
     }
-  }
-
-  private boolean play() {
-    String fileName = mRecordedFile.getAbsolutePath();
-
-    final MediaPlayer player = new MediaPlayer();
-
-    final ProgressDialog playingDialog = new ProgressDialog(this);
-    playingDialog.setCancelable(true);
-    playingDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-          @Override
-          public void onCancel(DialogInterface dialog) {
-            player.stop();
-          }
-        });
-
-    MediaPlayer.OnCompletionListener finishedPlayingListener =
-        new MediaPlayer.OnCompletionListener() {
-              @Override
-              public void onCompletion(MediaPlayer mp) {
-                playingDialog.dismiss();
-                mp.reset();
-                mp.release();
-              }
-            };
-    player.setOnCompletionListener(finishedPlayingListener);
-
-    player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-          @Override
-          public boolean onError(MediaPlayer mp, int what, int extra) {
-            new AlertDialog.Builder(ReviewActivity.this)
-                .setCancelable(true)
-                .setMessage(R.string.error_playing)
-                .show();
-            return false;
-          }
-        });
-
-    try {
-      player.setDataSource(fileName);
-    } catch (IllegalArgumentException e) {
-      throw new RuntimeException(e);
-    } catch (IllegalStateException e) {
-      throw new RuntimeException(e);
-    } catch (IOException e) {
-      Log.e("MOO", "Failed to set datasource to file at location '" + fileName +
-          "'.");
-      return false;
-    }
-
-    try {
-      player.prepare();
-    } catch (IllegalStateException e) {
-      throw new RuntimeException(e);
-    } catch (IOException e) {
-      Log.e("MOO", "Failed to prepare to play file at location '" + fileName +
-          "'.");
-      return false;
-    }
-
-    player.start();
-    playingDialog.show();
-
-    return true;
   }
 
   private void deleteAndRecord() {
