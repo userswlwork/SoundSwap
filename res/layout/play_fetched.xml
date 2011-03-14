@@ -12,4 +12,8 @@
        android:id="@+id/record_new" 
        android:layout_width="wrap_content" 
        android:layout_height="wrap_content" />
+    <Button android:text="@string/fetch_sound"
+       android:id="@+id/fetch_sound" 
+       android:layout_width="wrap_content" 
+       android:layout_height="wrap_content" />
 </LinearLayout>

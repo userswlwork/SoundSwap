@@ -19,6 +19,11 @@ public class Util {
   private static final AtomicReference<String> mDeviceId =
       new AtomicReference<String>(null);
 
+  private static final String HOST = "http://10.1.10.12:8080";
+  public static final String FORM_REDIRECT_URL = HOST + "/upload/form_redirect";
+  public static final String FETCH_SOUND_URL = HOST + "/sound";
+  public static final String DEVICE_ID_URI_KEY = "device_id";
+
   public static final String TEMP_DIR = "temp";
   public static final String FETCHED_DIR = "fetched";
   public static final String RECORDED_DIR = "recorded";
@@ -55,6 +60,17 @@ public class Util {
       long timeMillis,
       int latitudeE6,
       int longitudeE6) {
+    String deviceId = getDeviceId(context);
+    return new StringBuilder()
+        .append(deviceId).append("_")
+        .append(timeMillis).append("_")
+        .append(latitudeE6).append("_")
+        .append(longitudeE6)
+        .append(".").append(RECORDING_FILE_EXTENSION)
+        .toString();
+  }
+
+  public static String getDeviceId(Context context) {
     String deviceId = mDeviceId.get();
     if (deviceId == null) {
       TelephonyManager manager = (TelephonyManager) context.getSystemService(
@@ -65,14 +81,7 @@ public class Util {
       }
       mDeviceId.set(deviceId);
     }
-
-    return new StringBuilder()
-        .append(deviceId).append("_")
-        .append(timeMillis).append("_")
-        .append(latitudeE6).append("_")
-        .append(longitudeE6)
-        .append(".").append(RECORDING_FILE_EXTENSION)
-        .toString();
+    return deviceId;
   }
 
   public static File getFetchedFilename(long timeMillis) {

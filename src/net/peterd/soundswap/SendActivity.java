@@ -28,9 +28,6 @@ public class SendActivity extends Activity {
 
   public static final String FILENAME_EXTRA = "filename";
 
-  private static final String HOST = "http://10.1.10.12:8080";
-  public static final String FORM_REDIRECT_URL = HOST + "/upload/form_redirect";
-
   private File mCompressedFile;
 
   @Override
@@ -148,7 +145,7 @@ public class SendActivity extends Activity {
         // Get the upload redirect Uri.
         String uploadUri = null;
         try {
-          HttpGet getUploadUrl = new HttpGet(FORM_REDIRECT_URL);
+          HttpGet getUploadUrl = new HttpGet(Util.FORM_REDIRECT_URL);
           HttpResponse response = client.execute(getUploadUrl);
           Header[] headers = response.getHeaders(HEADER_LOCATION);
           if (headers == null || headers.length != 1) {

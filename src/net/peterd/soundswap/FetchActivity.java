@@ -37,12 +37,18 @@ public class FetchActivity extends Activity {
     super.onResume();
 
     Intent intent = getIntent();
-    Uri fetchUri = Uri.parse(intent.getStringExtra(FETCH_URI_EXTRA));
+
+    Uri fetchUri;
+    if (intent.hasExtra(FETCH_URI_EXTRA)) {
+      fetchUri = Uri.parse(intent.getStringExtra(FETCH_URI_EXTRA));
+    } else {
+      fetchUri = getFetchSoundUri();
+    }
 
     ProgressDialog dialog = new ProgressDialog(this);
     final Fetcher fetcher = new Fetcher(this, dialog);
 
-    dialog.setMessage(getString(R.string.compressing));
+    dialog.setMessage(getString(R.string.fetching));
     dialog.setProgress(0);
     dialog.setIndeterminate(false);
     dialog.setCancelable(true);
@@ -66,6 +72,12 @@ public class FetchActivity extends Activity {
     dialog.show();
 
     fetcher.execute(fetchUri);
+  }
+
+  private Uri getFetchSoundUri() {
+    return Uri.parse(Util.FETCH_SOUND_URL).buildUpon()
+        .appendQueryParameter(Util.DEVICE_ID_URI_KEY, Util.getDeviceId(this))
+        .build();
   }
 
   private static class Fetcher extends AsyncTask<Uri, Double, File> {

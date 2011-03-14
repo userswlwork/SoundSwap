@@ -36,6 +36,14 @@ public class PlayFetchedActivity extends Activity {
             startActivity(new Intent(activity, RecordActivity.class));
           }
         });
+
+    Button fetchSoundButton = (Button) findViewById(R.id.fetch_sound);
+    fetchSoundButton.setOnClickListener(new View.OnClickListener() {
+          @Override
+          public void onClick(View v) {
+            startActivity(new Intent(activity, FetchActivity.class));
+          }
+        });
   }
 
   @Override

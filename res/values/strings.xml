@@ -6,6 +6,7 @@
     <string name="record_stop">Stop Recording</string>
     <string name="record_retry">Delete and Retry</string>
     <string name="record_new">Send Another</string>
+    <string name="fetch_sound">Get Another</string>
     
     <string name="play">Play</string>
     <string name="error_playing">Error Playing</string>
@@ -20,4 +21,5 @@
     <string name="recording">Recording...</string>
     <string name="compressing">Compressing...</string>
     <string name="sending">Sending...</string>
+    <string name="fetching">Downloading...</string>
 </resources>
