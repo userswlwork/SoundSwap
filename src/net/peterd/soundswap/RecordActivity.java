@@ -295,9 +295,10 @@ public class RecordActivity extends Activity implements LocationListener {
           "location.");
     }
 
-    String finalFilename = Util.getRecordedFile(mTempAudioFileStartTimeMs,
-            (int) (mLatestLocation.getLatitude() * 1E6),
-            (int) (mLatestLocation.getLongitude() * 1E6));
+    String finalFilename = Util.getRecordedFile(this,
+        mTempAudioFileStartTimeMs,
+        (int) (mLatestLocation.getLatitude() * 1E6),
+        (int) (mLatestLocation.getLongitude() * 1E6));
     Log.i("MOO", "Renaming '" + mTempAudioFile.getAbsolutePath() + "' to '" +
         finalFilename + "'.");
     boolean renamed = mTempAudioFile.renameTo(new File(finalFilename));

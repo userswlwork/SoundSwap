@@ -2,6 +2,7 @@ package net.peterd.soundswap;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
@@ -10,9 +11,13 @@ import android.content.DialogInterface;
 import android.media.AudioFormat;
 import android.media.MediaPlayer;
 import android.os.Environment;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 
 public class Util {
+
+  private static final AtomicReference<String> mDeviceId =
+      new AtomicReference<String>(null);
 
   public static final String TEMP_DIR = "temp";
   public static final String FETCHED_DIR = "fetched";
@@ -33,25 +38,41 @@ public class Util {
     return externalStorage;
   }
 
-  public static String getRecordedFile(long timeMillis,
+  public static String getRecordedFile(Context context,
+      long timeMillis,
       int latitudeE6,
       int longitudeE6) {
     File cacheDir = getFilesDir(RECORDED_DIR);
-    String filename =
-        getFilename(System.currentTimeMillis(), latitudeE6, longitudeE6);
+    String filename = getFilename(context,
+        System.currentTimeMillis(),
+        latitudeE6,
+        longitudeE6);
     String fullFilename = cacheDir.getAbsolutePath() + "/" + filename;
     return fullFilename;
   }
 
-  private static String getFilename(long timeMillis,
+  private static String getFilename(Context context,
+      long timeMillis,
       int latitudeE6,
       int longitudeE6) {
-    StringBuilder builder = new StringBuilder();
-    builder.append(timeMillis).append("_");
-    builder.append(latitudeE6).append("_");
-    builder.append(longitudeE6);
-    builder.append(".").append(RECORDING_FILE_EXTENSION);
-    return builder.toString();
+    String deviceId = mDeviceId.get();
+    if (deviceId == null) {
+      TelephonyManager manager = (TelephonyManager) context.getSystemService(
+          Context.TELEPHONY_SERVICE);
+      deviceId = manager.getDeviceId();
+      if (deviceId == null) {
+        deviceId = "null";
+      }
+      mDeviceId.set(deviceId);
+    }
+
+    return new StringBuilder()
+        .append(deviceId).append("_")
+        .append(timeMillis).append("_")
+        .append(latitudeE6).append("_")
+        .append(longitudeE6)
+        .append(".").append(RECORDING_FILE_EXTENSION)
+        .toString();
   }
 
   public static File getFetchedFilename(long timeMillis) {
