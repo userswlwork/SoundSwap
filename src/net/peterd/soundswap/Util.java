@@ -19,7 +19,7 @@ public class Util {
   private static final AtomicReference<String> mDeviceId =
       new AtomicReference<String>(null);
 
-  private static final String HOST = "http://sound-swap.appspot.com";
+  private static final String HOST = "http://sound-swap.appspot.com"; // "http://10.1.10.12:8080";
   public static final String FORM_REDIRECT_URL = HOST + "/upload/form_redirect";
   public static final String FETCH_SOUND_URL = HOST + "/sound";
   public static final String DEVICE_ID_URI_KEY = "device_id";
@@ -84,13 +84,16 @@ public class Util {
     return deviceId;
   }
 
-  public static File getFetchedFilename(long timeMillis) {
+  /**
+   * Get a full, absolute filename for the given fetched filename.
+   * @param filename
+   * @return
+   */
+  public static File getFetchedFilename(String filename) {
     return new File(new StringBuilder()
         .append(getFilesDir(FETCHED_DIR))
         .append("/")
-        .append(timeMillis)
-        .append(".")
-        .append(RECORDING_FILE_EXTENSION)
+        .append(filename)
         .toString());
   }
 

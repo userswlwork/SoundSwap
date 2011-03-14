@@ -4,7 +4,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
@@ -106,9 +108,17 @@ public class FetchActivity extends Activity {
       Uri inputUri = uris[0];
       DefaultHttpClient client = new DefaultHttpClient();
 
+      final AtomicReference<String> filename =
+          new AtomicReference<String>(null);
       ResponseHandler<byte[]> handler = new ResponseHandler<byte[]>() {
             public byte[] handleResponse(HttpResponse response)
                   throws ClientProtocolException, IOException {
+              Header[] filenames = response.getHeaders("X-SoundSwap-Filename");
+              if (filenames != null && filenames.length == 1) {
+                filename.set(filenames[0].getValue());
+                Log.i("MOO", "Fetched filename: " + filename.get());
+              }
+
               HttpEntity entity = response.getEntity();
               if (entity != null) {
                 return EntityUtils.toByteArray(entity);
@@ -118,16 +128,18 @@ public class FetchActivity extends Activity {
             }
           };
 
-      File file = Util.getFetchedFilename(System.currentTimeMillis());
-
+      File file;
       try {
         HttpGet getSound = new HttpGet(inputUri.toString());
-        byte[] response = client.execute(getSound, handler);
-        Log.i("MOO", "Downloaded " + response.length + " bytes.");
+        byte[] data = client.execute(getSound, handler);
+        file = Util.getFetchedFilename(filename.get());
 
-        FileOutputStream fos = new FileOutputStream(file);
-        fos.write(response);
-        fos.close();
+        if (data != null) {
+          Log.i("MOO", "Downloaded " + data.length + " bytes.");
+          FileOutputStream fos = new FileOutputStream(file);
+          fos.write(data);
+          fos.close();
+        }
       } catch (Exception e) {
         Log.e("MOO", "Failed to fetch sound.", e);
         return null;
