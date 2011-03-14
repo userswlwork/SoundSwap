@@ -19,7 +19,7 @@ public class Util {
   private static final AtomicReference<String> mDeviceId =
       new AtomicReference<String>(null);
 
-  private static final String HOST = "http://10.1.10.12:8080";
+  private static final String HOST = "http://sound-swap.appspot.com";
   public static final String FORM_REDIRECT_URL = HOST + "/upload/form_redirect";
   public static final String FETCH_SOUND_URL = HOST + "/sound";
   public static final String DEVICE_ID_URI_KEY = "device_id";
