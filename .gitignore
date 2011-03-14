@@ -1,3 +1,4 @@
 .classpath
 .project
 bin
+gen/net/peterd/soundswap/R.java
