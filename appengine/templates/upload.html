@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block body %}
+
+<form action="{{ upload_url }}" method="POST" enctype="multipart/form-data">
+  <input type="hidden" name="device_id" value="{{ user.email }}" />
+  <input type="hidden" name="time_ms" value="500" />
+  <input type="hidden" name="latE6" value="0" />
+  <input type="hidden" name="lonE6" value="0" />
+  <input type="hidden" name="from_web" value="True" />
+
+  Upload file: <input type="file" name="file" /><br />
+  <input type="submit" name="Submit" />
+</form>
+
+{% endblock %}

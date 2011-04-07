@@ -1,0 +1,12 @@
+application: sound-swap
+version: 1
+runtime: python
+api_version: 1
+
+handlers:
+- url: /css
+  static_dir: static/css
+- url: /res
+  static_dir: static/res
+- url: .*
+  script: main.py

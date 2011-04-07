@@ -1,0 +1,17 @@
+<html>
+<head>
+  <title>SoundSwap</title>
+  <!-- TODO: Research more whether or not it's possible to disable rotation -->
+  <link href="/css/main.css" rel="stylesheet" type="text/css">
+</head>
+<body>
+<div id="header">
+  {% if logged_in %}
+    {{ user.email }} - <a href="{{ logout_url }}">Log Out</a>
+  {% else %}
+    <a href="{{ login_url }}">Log In</a>
+  {% endif %}
+</div>
+{% block body %}{% endblock %}
+</body>
+</html>
