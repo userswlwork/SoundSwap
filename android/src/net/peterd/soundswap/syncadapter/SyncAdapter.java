@@ -52,6 +52,8 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
       String authority,
       ContentProviderClient provider,
       SyncResult syncResult) {
+    Log.i(Constants.TAG, "Synchronizing '" + account + "'.");
+
     File[] files = Util.getRecordedFiles(account, mContext);
     String[] filenames = new String[files.length];
     for (int i = 0; i < files.length; ++i) {
@@ -109,11 +111,13 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
       mClient = client;
     }
 
-    protected boolean sendFile(File inputF) {
+    protected boolean sendFile(final File inputF) {
       if (!inputF.exists()) {
         throw new IllegalArgumentException("File " + inputF.getAbsolutePath()
             + " does not exist.");
       }
+
+      Log.i(Constants.TAG, "Uploading '" + inputF + "'.");
 
       // Get the upload redirect Uri.
       String uploadUri = mClient.request(new HttpGet(Util.FORM_REDIRECT_URL),
@@ -140,6 +144,7 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
             @Override
             public Boolean handleResponse(HttpResponse response)
                 throws ClientProtocolException, IOException {
+              Log.i(Constants.TAG, "Finished uploading '" + inputF + "'.");
               return true;
             }
           });

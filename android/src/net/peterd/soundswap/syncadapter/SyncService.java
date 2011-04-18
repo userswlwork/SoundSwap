@@ -1,12 +1,12 @@
 /*
  * Copyright (C) 2010 The Android Open Source Project
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -16,6 +16,8 @@
 
 package net.peterd.soundswap.syncadapter;
 
+import net.peterd.soundswap.Preferences;
+import android.accounts.Account;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
@@ -26,12 +28,10 @@ import android.os.IBinder;
  * IBinder.
  */
 public class SyncService extends Service {
+
     private static final Object sSyncAdapterLock = new Object();
     private static SyncAdapter sSyncAdapter = null;
 
-    /*
-     * {@inheritDoc}
-     */
     @Override
     public void onCreate() {
         synchronized (sSyncAdapterLock) {
@@ -41,9 +41,23 @@ public class SyncService extends Service {
         }
     }
 
-    /*
-     * {@inheritDoc}
-     */
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+      super.onStartCommand(intent, flags, startId);
+      Preferences preferences = new Preferences(this);
+      Account account = preferences.getAccount();
+      if (account != null) {
+        synchronized (sSyncAdapterLock) {
+          sSyncAdapter.onPerformSync(account,
+              null,
+              null,
+              null,
+              null);
+        }
+      }
+      return START_NOT_STICKY;
+    }
+
     @Override
     public IBinder onBind(Intent intent) {
         return sSyncAdapter.getSyncAdapterBinder();

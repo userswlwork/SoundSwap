@@ -47,6 +47,13 @@ public class ChooseAccountActivity extends ListActivity {
   }
 
   @Override
+  public void onActivityResult(int requestCode, int resultCode, Intent data) {
+    // TODO: figure out what happens when the user says "no" to permission to
+    // use their account.
+    data.toString();
+  }
+
+  @Override
   protected void onListItemClick(ListView l, View v, int position, long id) {
     Account account = (Account) getListView().getItemAtPosition(position);
 
@@ -61,7 +68,7 @@ public class ChooseAccountActivity extends ListActivity {
   }
 
   private void proceed() {
-    startActivity(new Intent(this, RecordActivity.class));
+    startActivity(new Intent(this, RecordingsListActivity.class));
     finish();
   }
 
@@ -72,7 +79,7 @@ public class ChooseAccountActivity extends ListActivity {
         bundle = result.getResult();
         Intent intent = (Intent) bundle.get(AccountManager.KEY_INTENT);
         if (intent != null) {
-          startActivity(intent);
+          startActivityForResult(intent, 0);
           // TODO: handle account result, and proceed or re-prompt
         } else {
           proceed();

@@ -17,26 +17,35 @@
         <activity android:name=".ui.RecordActivity" android:label="@string/app_name" />
         <activity android:name=".ui.RecordingsListActivity" android:label="RecordingsListActivity" />
         <activity android:name=".ui.ReviewActivity" android:label="ReviewActivity" />
-        <service
-            android:name="syncadapter.SyncService"
+        <service android:name=".syncadapter.SyncService"
             android:exported="true">
             <intent-filter>
-                <action
-                    android:name="android.content.SyncAdapter" />
+                <action android:name="android.content.SyncAdapter" />
             </intent-filter>
-            <meta-data
-                android:name="android.content.SyncAdapter"
+            <meta-data android:name="android.content.SyncAdapter"
                 android:resource="@xml/syncadapter" />
         </service>
+		<receiver android:name=".syncadapter.SyncTimer"
+		  android:enabled="true"
+		  android:exported="false"
+		  android:label="SyncTimer">
+		  <intent-filter>
+		    <action android:name="android.intent.action.BOOT_COMPLETED"/>
+		   </intent-filter>
+		</receiver>
     </application>
 
     <uses-sdk android:minSdkVersion="5" />
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+	<uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.USE_CREDENTIALS" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-</manifest> 
+	<uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
+</manifest>

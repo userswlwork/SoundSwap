@@ -4,6 +4,7 @@ import java.io.File;
 
 import net.peterd.soundswap.R;
 import net.peterd.soundswap.Util;
+import net.peterd.soundswap.syncadapter.SyncService;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
@@ -76,6 +77,10 @@ public class ReviewActivity extends AuthenticatedActivity {
   }
 
   private void accept() {
-    startActivity(new Intent(this, ChooseAccountActivity.class));
+    // Start synchronization
+    startService(new Intent(this, SyncService.class));
+
+    // Go to the list of sounds
+    startActivity(new Intent(this, RecordingsListActivity.class));
   }
 }

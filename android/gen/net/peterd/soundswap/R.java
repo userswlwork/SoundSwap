@@ -34,7 +34,8 @@ public final class R {
         public static final int login_activity=0x7f030003;
         public static final int play_fetched=0x7f030004;
         public static final int record=0x7f030005;
-        public static final int review=0x7f030006;
+        public static final int recording_list_item=0x7f030006;
+        public static final int review=0x7f030007;
     }
     public static final class string {
         public static final int accept=0x7f050008;
@@ -111,7 +112,6 @@ public final class R {
         public static final int waiting_for_location=0x7f05000c;
     }
     public static final class xml {
-        public static final int authenticator=0x7f040000;
-        public static final int syncadapter=0x7f040001;
+        public static final int syncadapter=0x7f040000;
     }
 }

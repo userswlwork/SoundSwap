@@ -68,6 +68,8 @@ public class AuthenticatedHttpClient {
 
   public AuthenticatedHttpClient(Context context,
       RedirectHandler redirectHandler) {
+    Log.i(Constants.TAG, "Initializing authenticated http client.");
+
     mContext = context;
     mPreferences = new Preferences(context);
 
@@ -84,6 +86,8 @@ public class AuthenticatedHttpClient {
   }
 
   public <T> T request(HttpUriRequest request, ResponseHandler<T> responseProcessor) {
+    Log.i(Constants.TAG, "Request (" + request.getURI() + ")");
+
     String authCookie = mPreferences.getAuthCookie();
     if (authCookie == null) {
       requestAuthCookie();
@@ -93,6 +97,8 @@ public class AuthenticatedHttpClient {
   }
 
   private void requestAuthCookie() {
+    Log.i(Constants.TAG, "Authenticating");
+
     AccountManager accountManager = AccountManager.get(mContext);
     Account account = mPreferences.getAccount();
     if (account == null) {
@@ -118,6 +124,7 @@ public class AuthenticatedHttpClient {
       HttpUriRequest request,
       String authCookie) {
     try {
+      Log.i(Constants.TAG, "Doing request (" + request.getURI() + ")");
       return mClient.execute(request, responseHandler);
     } catch (ClientProtocolException e) {
       Log.e(TAG, "Failed to execute request.", e);
@@ -160,6 +167,7 @@ public class AuthenticatedHttpClient {
     }
 
     private boolean authenticate(String authToken) {
+      Log.i(Constants.TAG, "Authenticating with token " + authToken);
       Uri requestUri = new Uri.Builder()
           .scheme("https")
           .authority(Util.APPENGINE_DOMAIN)
@@ -181,6 +189,7 @@ public class AuthenticatedHttpClient {
                   }
                 });
         mClient.setRedirectHandler(mRedirectHandler);
+        Log.i(Constants.TAG, "Authenticated: " + authenticated);
         return authenticated;
       } catch (ClientProtocolException e) {
         Log.e(TAG, "Failed to authenticate due to network error.", e);
