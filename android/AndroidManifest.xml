@@ -5,25 +5,38 @@
       android:versionName="1.0"
       android:debuggable="true">
     <application android:icon="@drawable/icon" android:label="@string/app_name">
-        <activity android:name=".CompressActivity" android:label="CompressActivity" />
-        <activity android:name=".FetchActivity" android:label="FetchActivity" />
-        <activity android:name=".PlayFetchedActivity" android:label="PlayFetchedActivity" />
-        <activity android:name=".RecordActivity"
-                  android:label="@string/app_name">
+        <activity android:name=".ui.ChooseAccountActivity" android:label="ChooseAccountActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".ReviewActivity" android:label="ReviewActivity" />
-        <activity android:name=".SendActivity" android:label="SendActivity" />
+        <activity android:name=".ui.CompressActivity" android:label="CompressActivity" />
+        <activity android:name=".ui.FetchActivity" android:label="FetchActivity" />
+        <activity android:name=".ui.PlayFetchedActivity" android:label="PlayFetchedActivity" />
+        <activity android:name=".ui.RecordActivity" android:label="@string/app_name" />
+        <activity android:name=".ui.RecordingsListActivity" android:label="RecordingsListActivity" />
+        <activity android:name=".ui.ReviewActivity" android:label="ReviewActivity" />
+        <service
+            android:name="syncadapter.SyncService"
+            android:exported="true">
+            <intent-filter>
+                <action
+                    android:name="android.content.SyncAdapter" />
+            </intent-filter>
+            <meta-data
+                android:name="android.content.SyncAdapter"
+                android:resource="@xml/syncadapter" />
+        </service>
     </application>
 
-    <uses-sdk android:minSdkVersion="3" />
+    <uses-sdk android:minSdkVersion="5" />
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.USE_CREDENTIALS" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 </manifest> 

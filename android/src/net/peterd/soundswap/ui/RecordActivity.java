@@ -1,4 +1,4 @@
-package net.peterd.soundswap;
+package net.peterd.soundswap.ui;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -6,7 +6,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import android.app.Activity;
+import net.peterd.soundswap.R;
+import net.peterd.soundswap.Util;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
@@ -24,7 +25,8 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
-public class RecordActivity extends Activity implements LocationListener {
+public class RecordActivity extends AuthenticatedActivity
+    implements LocationListener {
 
   ProgressDialog mWaitingForLocationDialog;
   LocationManager mLocationManager;
@@ -39,15 +41,16 @@ public class RecordActivity extends Activity implements LocationListener {
   @Override
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
+
     setContentView(R.layout.record);
 
     final Button startRecording = (Button) findViewById(R.id.record_start);
     startRecording.setOnClickListener(new View.OnClickListener() {
-          @Override
-          public void onClick(View v) {
-            startRecording();
-          }
-        });
+      @Override
+      public void onClick(View v) {
+        startRecording();
+      }
+    });
   }
 
   @Override
@@ -70,19 +73,18 @@ public class RecordActivity extends Activity implements LocationListener {
           .setMessage(R.string.location_device_error)
           .setCancelable(true)
           .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                @Override
-                public void onCancel(DialogInterface dialog) {
-                  finish();
-                }
-              })
+            @Override
+            public void onCancel(DialogInterface dialog) {
+              finish();
+            }
+          })
           .setPositiveButton(R.string.disappointed_but_okay,
               new DialogInterface.OnClickListener() {
-                  @Override
-                  public void onClick(DialogInterface dialog, int which) {
-                    finish();
-                  }
-                })
-          .show();
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                  finish();
+                }
+              }).show();
       return;
     }
 
@@ -111,9 +113,9 @@ public class RecordActivity extends Activity implements LocationListener {
    */
   private boolean startRecording() {
     try {
-      mTempAudioFile = File.createTempFile("audio",
-          "." + Util.RECORDING_FILE_EXTENSION,
-          Util.getFilesDir(Util.TEMP_DIR));
+      mTempAudioFile = File.createTempFile("audio", "."
+          + Util.RECORDING_FILE_EXTENSION,
+          Util.getFilesDir(getAccount(), Util.TEMP_DIR));
     } catch (IOException e1) {
       Log.e("MOO", "Failed to create temporary file.", e1);
       return false;
@@ -155,21 +157,32 @@ public class RecordActivity extends Activity implements LocationListener {
       try {
         RandomAccessFile output = new RandomAccessFile(mOutputFile, "rw");
 
-        short bSamples = Util.RECORDING_ENCODING == AudioFormat.ENCODING_PCM_16BIT ? 16 : 8;
+        short bSamples = Util.RECORDING_ENCODING == AudioFormat.ENCODING_PCM_16BIT ? 16
+            : 8;
 
         // Write file header.
         try {
-          output.setLength(0); // Set file length to 0, to prevent unexpected behavior in case the file already existed
+          output.setLength(0); // Set file length to 0, to prevent unexpected
+                               // behavior in case the file already existed
           output.writeBytes("RIFF");
           output.writeInt(0); // Final file size not known yet, write 0
           output.writeBytes("WAVE");
           output.writeBytes("fmt ");
-          output.writeInt(Integer.reverseBytes(16)); // Sub-chunk size, 16 for PCM
-          output.writeShort(Short.reverseBytes((short) 1)); // AudioFormat, 1 for PCM
-          output.writeShort(Short.reverseBytes((short) 1)); // Number of channels, 1 for mono
-          output.writeInt(Integer.reverseBytes(Util.RECORDING_SAMPLE_RATE)); // Sample rate
-          output.writeInt(Integer.reverseBytes(Util.RECORDING_SAMPLE_RATE*bSamples/8)); // Byte rate, SampleRate*NumberOfChannels*BitsPerSample/8
-          output.writeShort(Short.reverseBytes((short)(bSamples/8))); // Block align, NumberOfChannels*BitsPerSample/8
+          output.writeInt(Integer.reverseBytes(16)); // Sub-chunk size, 16 for
+                                                     // PCM
+          output.writeShort(Short.reverseBytes((short) 1)); // AudioFormat, 1
+                                                            // for PCM
+          output.writeShort(Short.reverseBytes((short) 1)); // Number of
+                                                            // channels, 1 for
+                                                            // mono
+          output.writeInt(Integer.reverseBytes(Util.RECORDING_SAMPLE_RATE)); // Sample
+                                                                             // rate
+          output.writeInt(Integer.reverseBytes(Util.RECORDING_SAMPLE_RATE
+              * bSamples / 8)); // Byte rate,
+                                // SampleRate*NumberOfChannels*BitsPerSample/8
+          output.writeShort(Short.reverseBytes((short) (bSamples / 8))); // Block
+                                                                         // align,
+                                                                         // NumberOfChannels*BitsPerSample/8
           output.writeShort(Short.reverseBytes(bSamples)); // Bits per sample
           output.writeBytes("data");
           output.writeInt(0); // Data chunk size not known yet, write 0
@@ -178,16 +191,14 @@ public class RecordActivity extends Activity implements LocationListener {
           return;
         }
 
-        int bufferSize = AudioRecord.getMinBufferSize(Util.RECORDING_SAMPLE_RATE,
-            Util.RECORDING_CHANNEL,
+        int bufferSize = AudioRecord.getMinBufferSize(
+            Util.RECORDING_SAMPLE_RATE, Util.RECORDING_CHANNEL,
             Util.RECORDING_ENCODING);
         Log.i("MOO", "Recording buffer size: " + bufferSize);
 
-        AudioRecord audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
-            Util.RECORDING_SAMPLE_RATE,
-            Util.RECORDING_CHANNEL,
-            Util.RECORDING_ENCODING,
-            bufferSize);
+        AudioRecord audioRecord = new AudioRecord(
+            MediaRecorder.AudioSource.MIC, Util.RECORDING_SAMPLE_RATE,
+            Util.RECORDING_CHANNEL, Util.RECORDING_ENCODING, bufferSize);
 
         short[] buffer = new short[bufferSize];
 
@@ -200,11 +211,10 @@ public class RecordActivity extends Activity implements LocationListener {
           int bufferReadResult = audioRecord.read(buffer, 0, bufferSize);
 
           if (bufferReadResult == AudioRecord.ERROR_INVALID_OPERATION) {
-            throw new IllegalStateException("Invalid audiorecord read " +
-                "operation.");
+            throw new IllegalStateException("Invalid audiorecord read "
+                + "operation.");
           } else if (bufferReadResult == AudioRecord.ERROR_BAD_VALUE) {
-            throw new IllegalStateException("Audiorecord read " +
-                "bad value.");
+            throw new IllegalStateException("Audiorecord read " + "bad value.");
           }
 
           for (int i = 0; i < bufferReadResult; i++) {
@@ -226,7 +236,7 @@ public class RecordActivity extends Activity implements LocationListener {
 
         try {
           output.seek(4); // Write size to RIFF header
-          output.writeInt(Integer.reverseBytes(36+payloadSize));
+          output.writeInt(Integer.reverseBytes(36 + payloadSize));
           output.seek(40); // Write size to Subchunk2Size field
           output.writeInt(Integer.reverseBytes(payloadSize));
           output.close();
@@ -266,15 +276,15 @@ public class RecordActivity extends Activity implements LocationListener {
     if (mLatestLocation == null) {
       mWaitingForLocationDialog = new ProgressDialog(this);
       mWaitingForLocationDialog.setCancelable(true);
-      mWaitingForLocationDialog.setOnCancelListener(
-          new DialogInterface.OnCancelListener() {
-                @Override
-                public void onCancel(DialogInterface dialog) {
-                  deleteTempFile();
-                }
-              });
-      mWaitingForLocationDialog.setMessage(
-          getString(R.string.waiting_for_location));
+      mWaitingForLocationDialog
+          .setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override
+            public void onCancel(DialogInterface dialog) {
+              deleteTempFile();
+            }
+          });
+      mWaitingForLocationDialog
+          .setMessage(getString(R.string.waiting_for_location));
       mWaitingForLocationDialog.show();
     } else {
       renameTempFile();
@@ -291,20 +301,21 @@ public class RecordActivity extends Activity implements LocationListener {
    */
   private void renameTempFile() {
     if (mLatestLocation == null) {
-      throw new IllegalStateException("Trying to rename temp file without a " +
-          "location.");
+      throw new IllegalStateException("Trying to rename temp file without a "
+          + "location.");
     }
 
     String finalFilename = Util.getRecordedFile(this,
+        getAccount(),
         mTempAudioFileStartTimeMs,
         (int) (mLatestLocation.getLatitude() * 1E6),
         (int) (mLatestLocation.getLongitude() * 1E6));
-    Log.i("MOO", "Renaming '" + mTempAudioFile.getAbsolutePath() + "' to '" +
-        finalFilename + "'.");
+    Log.i("MOO", "Renaming '" + mTempAudioFile.getAbsolutePath() + "' to '"
+        + finalFilename + "'.");
     boolean renamed = mTempAudioFile.renameTo(new File(finalFilename));
     if (!renamed) {
-      throw new IllegalStateException("Could not rename file from '" +
-          mTempAudioFile.getAbsolutePath() + "' to '" + finalFilename + "'.");
+      throw new IllegalStateException("Could not rename file from '"
+          + mTempAudioFile.getAbsolutePath() + "' to '" + finalFilename + "'.");
     }
 
     Intent reviewIntent = new Intent(this, ReviewActivity.class);

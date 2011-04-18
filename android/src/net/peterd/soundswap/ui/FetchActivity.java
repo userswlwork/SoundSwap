@@ -1,4 +1,4 @@
-package net.peterd.soundswap;
+package net.peterd.soundswap.ui;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -6,17 +6,21 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import net.peterd.soundswap.R;
+import net.peterd.soundswap.Util;
+import net.peterd.soundswap.client.AuthenticatedHttpClient;
+
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 
-import android.app.Activity;
+import android.accounts.Account;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
@@ -24,7 +28,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 
-public class FetchActivity extends Activity {
+public class FetchActivity extends AuthenticatedActivity {
 
   public static final String FETCH_URI_EXTRA = "fetch_uri";
 
@@ -48,7 +52,10 @@ public class FetchActivity extends Activity {
     }
 
     ProgressDialog dialog = new ProgressDialog(this);
-    final Fetcher fetcher = new Fetcher(this, dialog);
+    final Fetcher fetcher = new Fetcher(this,
+        getAccount(),
+        new AuthenticatedHttpClient(this, null),
+        dialog);
 
     dialog.setMessage(getString(R.string.fetching));
     dialog.setProgress(0);
@@ -65,12 +72,12 @@ public class FetchActivity extends Activity {
         });
     dialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
 
-          @Override
-          public void onCancel(DialogInterface dialog) {
-            fetcher.cancel(true);
-            finish();
-          }
-        });
+      @Override
+      public void onCancel(DialogInterface dialog) {
+        fetcher.cancel(true);
+        finish();
+      }
+    });
     dialog.show();
 
     fetcher.execute(fetchUri);
@@ -84,12 +91,19 @@ public class FetchActivity extends Activity {
 
   private static class Fetcher extends AsyncTask<Uri, Double, File> {
 
-    private final Activity mActivity;
+    private final Context mActivity;
+    private final Account mAccount;
+    private final AuthenticatedHttpClient mClient;
     private final ProgressDialog mDialog;
     private final AtomicBoolean mCancel = new AtomicBoolean(false);
 
-    public Fetcher(Activity activity, ProgressDialog dialog) {
+    public Fetcher(Context activity,
+        Account account,
+        AuthenticatedHttpClient client,
+        ProgressDialog dialog) {
       mActivity = activity;
+      mAccount = account;
+      mClient = client;
       mDialog = dialog;
     }
 
@@ -101,38 +115,36 @@ public class FetchActivity extends Activity {
     @Override
     protected File doInBackground(Uri... uris) {
       if (uris.length != 1) {
-            throw new IllegalArgumentException("Must specify exactly one uri " +
-                "to fetch from.");
+        throw new IllegalArgumentException("Must specify exactly one uri "
+            + "to fetch from.");
       }
 
       Uri inputUri = uris[0];
-      DefaultHttpClient client = new DefaultHttpClient();
 
-      final AtomicReference<String> filename =
-          new AtomicReference<String>(null);
+      final AtomicReference<String> filename = new AtomicReference<String>(null);
       ResponseHandler<byte[]> handler = new ResponseHandler<byte[]>() {
-            public byte[] handleResponse(HttpResponse response)
-                  throws ClientProtocolException, IOException {
-              Header[] filenames = response.getHeaders("X-SoundSwap-Filename");
-              if (filenames != null && filenames.length == 1) {
-                filename.set(filenames[0].getValue());
-                Log.i("MOO", "Fetched filename: " + filename.get());
-              }
+        public byte[] handleResponse(HttpResponse response)
+            throws ClientProtocolException, IOException {
+          Header[] filenames = response.getHeaders("X-SoundSwap-Filename");
+          if (filenames != null && filenames.length == 1) {
+            filename.set(filenames[0].getValue());
+            Log.i("MOO", "Fetched filename: " + filename.get());
+          }
 
-              HttpEntity entity = response.getEntity();
-              if (entity != null) {
-                return EntityUtils.toByteArray(entity);
-              } else {
-                return null;
-              }
-            }
-          };
+          HttpEntity entity = response.getEntity();
+          if (entity != null) {
+            return EntityUtils.toByteArray(entity);
+          } else {
+            return null;
+          }
+        }
+      };
 
       File file;
       try {
         HttpGet getSound = new HttpGet(inputUri.toString());
-        byte[] data = client.execute(getSound, handler);
-        file = Util.getFetchedFilename(filename.get());
+        byte[] data = mClient.request(getSound, handler);
+        file = Util.getFetchedFilename(mAccount, filename.get());
 
         if (data != null) {
           Log.i("MOO", "Downloaded " + data.length + " bytes.");

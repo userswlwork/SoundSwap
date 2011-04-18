@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
+import android.accounts.Account;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
@@ -19,9 +20,11 @@ public class Util {
   private static final AtomicReference<String> mDeviceId =
       new AtomicReference<String>(null);
 
-  private static final String HOST = "http://sound-swap.appspot.com"; // "http://10.1.10.12:8080";
+  public static final String APPENGINE_DOMAIN = "sound-swap.appspot.com"; // "10.1.10.12:8080";
+  public static final String HOST = "http://" + APPENGINE_DOMAIN;
   public static final String FORM_REDIRECT_URL = HOST + "/api/sound/upload_form_redirect";
   public static final String FETCH_SOUND_URL = HOST + "/api/sound";
+  public static final String LIST_SOUNDS_URL = HOST + "/api/sound/list";
   public static final String DEVICE_ID_URI_KEY = "device_id";
 
   public static final String TEMP_DIR = "temp";
@@ -33,27 +36,39 @@ public class Util {
   public static final int RECORDING_CHANNEL = AudioFormat.CHANNEL_CONFIGURATION_MONO;
   public static final int RECORDING_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
 
-  public static File getFilesDir(String subDir) {
+  public static File getFilesDir(Account account, String subDir) {
     File externalStorage = Environment.getExternalStorageDirectory();
     externalStorage =
         new File(externalStorage.getAbsolutePath() +
             "/SoundSwap" +
+            "/" + account.name +
             "/" + subDir);
     externalStorage.mkdirs();
     return externalStorage;
   }
 
+  public static File[] getRecordedFiles(Account account, Context context) {
+    File filesDir = getFilesDir(account, RECORDED_DIR);
+    return filesDir.listFiles();
+  }
+
   public static String getRecordedFile(Context context,
+      Account account,
       long timeMillis,
       int latitudeE6,
       int longitudeE6) {
-    File cacheDir = getFilesDir(RECORDED_DIR);
+    File cacheDir = getFilesDir(account, RECORDED_DIR);
     String filename = getFilename(context,
         System.currentTimeMillis(),
         latitudeE6,
         longitudeE6);
     String fullFilename = cacheDir.getAbsolutePath() + "/" + filename;
     return fullFilename;
+  }
+
+  public static File getRecordedFile(Account account, String filename) {
+    File cacheDir = getFilesDir(account, RECORDED_DIR);
+    return new File(cacheDir.getAbsolutePath() + "/" + filename);
   }
 
   private static String getFilename(Context context,
@@ -89,9 +104,9 @@ public class Util {
    * @param filename
    * @return
    */
-  public static File getFetchedFilename(String filename) {
+  public static File getFetchedFilename(Account account, String filename) {
     return new File(new StringBuilder()
-        .append(getFilesDir(FETCHED_DIR))
+        .append(getFilesDir(account, FETCHED_DIR))
         .append("/")
         .append(filename)
         .toString());
