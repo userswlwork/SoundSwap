@@ -8,28 +8,15 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.media.AudioFormat;
 import android.media.MediaPlayer;
 import android.os.Environment;
 import android.util.Log;
 
 public class Util {
 
-  public static final String APPENGINE_DOMAIN = "sound-swap.appspot.com";
-  public static final String HOST = "http://" + APPENGINE_DOMAIN;
-  public static final String HOST_SECURE = "https://" + APPENGINE_DOMAIN;
-  public static final String FORM_REDIRECT_URL = HOST + "/api/sound/upload_form_redirect";
-  public static final String FETCH_SOUND_URL = HOST + "/api/sound";
-  public static final String LIST_SOUNDS_URL = HOST + "/api/sound/list";
-
   public static final String TEMP_DIR = "temp";
   public static final String FETCHED_DIR = "fetched";
   public static final String RECORDED_DIR = "recorded";
-
-  public static final String RECORDING_FILE_EXTENSION = "wav";
-  public static final int RECORDING_SAMPLE_RATE = 22050;
-  public static final int RECORDING_CHANNEL = AudioFormat.CHANNEL_CONFIGURATION_MONO;
-  public static final int RECORDING_ENCODING = AudioFormat.ENCODING_PCM_16BIT;
 
   public static File getFilesDir(Account account, String subDir) {
     File externalStorage = Environment.getExternalStorageDirectory();
@@ -74,7 +61,7 @@ public class Util {
         .append(timeMillis).append("_")
         .append(latitudeE6).append("_")
         .append(longitudeE6)
-        .append(".").append(RECORDING_FILE_EXTENSION)
+        .append(".").append(Constants.RECORDING_FILE_EXTENSION)
         .toString();
   }
 

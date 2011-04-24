@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.R;
 import net.peterd.soundswap.Util;
 import android.app.AlertDialog;
@@ -114,7 +115,7 @@ public class RecordActivity extends AuthenticatedActivity
   private boolean startRecording() {
     try {
       mTempAudioFile = File.createTempFile("audio", "."
-          + Util.RECORDING_FILE_EXTENSION,
+          + Constants.RECORDING_FILE_EXTENSION,
           Util.getFilesDir(getAccount(), Util.TEMP_DIR));
     } catch (IOException e1) {
       Log.e("MOO", "Failed to create temporary file.", e1);
@@ -157,8 +158,8 @@ public class RecordActivity extends AuthenticatedActivity
       try {
         RandomAccessFile output = new RandomAccessFile(mOutputFile, "rw");
 
-        short bSamples = Util.RECORDING_ENCODING == AudioFormat.ENCODING_PCM_16BIT ? 16
-            : 8;
+        short bSamples = Constants.RECORDING_ENCODING ==
+            AudioFormat.ENCODING_PCM_16BIT ? 16 : 8;
 
         // Write file header.
         try {
@@ -175,9 +176,9 @@ public class RecordActivity extends AuthenticatedActivity
           output.writeShort(Short.reverseBytes((short) 1)); // Number of
                                                             // channels, 1 for
                                                             // mono
-          output.writeInt(Integer.reverseBytes(Util.RECORDING_SAMPLE_RATE)); // Sample
-                                                                             // rate
-          output.writeInt(Integer.reverseBytes(Util.RECORDING_SAMPLE_RATE
+          // Sample rate
+          output.writeInt(Integer.reverseBytes(Constants.RECORDING_SAMPLE_RATE));
+          output.writeInt(Integer.reverseBytes(Constants.RECORDING_SAMPLE_RATE
               * bSamples / 8)); // Byte rate,
                                 // SampleRate*NumberOfChannels*BitsPerSample/8
           output.writeShort(Short.reverseBytes((short) (bSamples / 8))); // Block
@@ -192,13 +193,17 @@ public class RecordActivity extends AuthenticatedActivity
         }
 
         int bufferSize = AudioRecord.getMinBufferSize(
-            Util.RECORDING_SAMPLE_RATE, Util.RECORDING_CHANNEL,
-            Util.RECORDING_ENCODING);
+            Constants.RECORDING_SAMPLE_RATE,
+            Constants.RECORDING_CHANNEL,
+            Constants.RECORDING_ENCODING);
         Log.i("MOO", "Recording buffer size: " + bufferSize);
 
         AudioRecord audioRecord = new AudioRecord(
-            MediaRecorder.AudioSource.MIC, Util.RECORDING_SAMPLE_RATE,
-            Util.RECORDING_CHANNEL, Util.RECORDING_ENCODING, bufferSize);
+            MediaRecorder.AudioSource.MIC,
+            Constants.RECORDING_SAMPLE_RATE,
+            Constants.RECORDING_CHANNEL,
+            Constants.RECORDING_ENCODING,
+            bufferSize);
 
         short[] buffer = new short[bufferSize];
 

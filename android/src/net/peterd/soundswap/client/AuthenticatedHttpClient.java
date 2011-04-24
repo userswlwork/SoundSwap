@@ -8,7 +8,6 @@ import java.util.Collection;
 
 import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.Preferences;
-import net.peterd.soundswap.Util;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
@@ -153,8 +152,8 @@ public class AuthenticatedHttpClient {
 
     private boolean authenticate(String authToken) {
       Log.d(Constants.TAG, "Authenticating with token " + authToken);
-      Uri requestUri = Uri.parse(Util.HOST + "/_ah/login").buildUpon()
-          .appendQueryParameter("continue", Util.HOST)
+      Uri requestUri = Uri.parse(Constants.HOST + "/_ah/login").buildUpon()
+          .appendQueryParameter("continue", Constants.HOST)
           .appendQueryParameter("auth", authToken)
           .build();
 

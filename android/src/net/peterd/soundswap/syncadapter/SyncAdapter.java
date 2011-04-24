@@ -1,5 +1,7 @@
 package net.peterd.soundswap.syncadapter;
 
+import static net.peterd.soundswap.Constants.TAG;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -53,7 +55,7 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
       String authority,
       ContentProviderClient provider,
       SyncResult syncResult) {
-    Log.i(Constants.TAG, "Synchronizing '" + account + "'.");
+    Log.i(TAG, "Synchronizing account '" + account + "'.");
 
     File[] files = Util.getRecordedFiles(account, mContext);
     String[] filenames = new String[files.length];
@@ -64,24 +66,26 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
     Set<String> filenamesToUpload = new HashSet<String>();
     Collections.addAll(filenamesToUpload, filenames);
 
-    HttpGet get = new HttpGet(Util.LIST_SOUNDS_URL);
+    HttpGet get = new HttpGet(Constants.LIST_SOUNDS_URL);
     Set<String> uploadedFileNames = mFileListClient.request(get,
         new ResponseHandler<Set<String>>() {
             @Override
             public Set<String> handleResponse(HttpResponse response)
                 throws ClientProtocolException, IOException {
-              Log.i(Constants.TAG, "List recordings response " + response.getStatusLine().getStatusCode() + "; " + Arrays.toString(response.getAllHeaders()));
-
               HttpEntity entity = response.getEntity();
               if (response.getStatusLine().getStatusCode() == 200 &&
                   entity != null) {
                 String contents = EntityUtils.toString(entity);
                 String[] lines = contents.split("\n");
+
+                Log.d(TAG, "List of uploaded recordings: " +
+                    Arrays.toString(lines));
+
                 Set<String> set = new HashSet<String>();
                 Collections.addAll(set, lines);
                 return set;
               } else {
-                Log.e(Constants.TAG, "List recordings failed.");
+                Log.e(TAG, "List recordings failed.");
                 return null;
               }
             }
@@ -95,8 +99,7 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
 
     for (String filename : filenamesToUpload) {
       if (!uploadFileWithName(account, filename)) {
-        Log.e(Constants.TAG, "Failed to upload file with name '" + filename +
-            "'.");
+        Log.e(TAG, "Failed to upload file with name '" + filename + "'.");
       }
     }
   }
@@ -123,29 +126,35 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
       }
 
       // Get the upload redirect Uri.
-      String uploadUri = mClient.request(new HttpGet(Util.FORM_REDIRECT_URL),
-            new ResponseHandler<String>() {
-              @Override
-              public String handleResponse(HttpResponse response)
-                  throws ClientProtocolException, IOException {
-                Log.i(Constants.TAG, "Get upload redirect location response " + response.getStatusLine().getStatusCode() + "; " + Arrays.toString(response.getAllHeaders()));
-
-                Header[] headers = response.getHeaders(HEADER_LOCATION);
-                if (headers == null || headers.length != 1) {
-                  throw new IllegalStateException(
-                      "Did not return a redirect location.");
-                }
-                return headers[0].getValue();
+      String uploadUri = mClient.request(
+          new HttpGet(Constants.FORM_REDIRECT_URL),
+          new ResponseHandler<String>() {
+            @Override
+            public String handleResponse(HttpResponse response)
+                throws ClientProtocolException, IOException {
+              Header[] headers = response.getHeaders(HEADER_LOCATION);
+              if (headers == null || headers.length != 1) {
+                return null;
+              } else {
+                String redirect = headers[0].getValue();
+                Log.d(TAG, "Get upload redirect location '" +
+                    redirect + "'.");
+                return redirect;
               }
-            });
+            }
+          });
+      if (uploadUri == null) {
+        return false;
+      }
 
       // Upload the file.
       FileBody body = new FileBody(inputF);
       MultipartEntity entity = new MultipartEntity();
       entity.addPart("bin", body);
       HttpPost postUpload = new HttpPost(uploadUri);
+      postUpload.setEntity(entity);
 
-      Log.i(Constants.TAG, "Uploading '" + inputF + "'.");
+      Log.d(TAG, "Uploading '" + inputF + "'.");
       return mClient.request(postUpload, new ResponseHandler<Boolean>() {
             @Override
             public Boolean handleResponse(HttpResponse response)
@@ -154,7 +163,8 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
               if (status == 200 || status == 302) {
                 return true;
               } else {
-                Log.e(Constants.TAG, "Failed to upload file; response code " + status + "; " + response.getStatusLine().getReasonPhrase());
+                Log.e(TAG, "Failed to upload file; response code " +
+                    status + "; " + response.getStatusLine().getReasonPhrase());
                 return false;
               }
             }

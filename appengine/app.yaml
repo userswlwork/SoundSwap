@@ -10,6 +10,6 @@ handlers:
   static_dir: static/res
 - url: /api/.*
   script: main.py
-  login: required
+  # login: required
 - url: .*
   script: main.py

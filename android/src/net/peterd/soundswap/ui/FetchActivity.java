@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.R;
 import net.peterd.soundswap.Util;
 import net.peterd.soundswap.client.AuthenticatedHttpClient;
@@ -69,7 +70,7 @@ public class FetchActivity extends AuthenticatedActivity {
     });
     dialog.show();
 
-    fetcher.execute(Uri.parse(Util.FETCH_SOUND_URL));
+    fetcher.execute(Uri.parse(Constants.FETCH_SOUND_URL));
   }
 
   private static class Fetcher extends AsyncTask<Uri, Double, File> {
