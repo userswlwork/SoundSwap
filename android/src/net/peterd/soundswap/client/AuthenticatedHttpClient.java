@@ -3,16 +3,14 @@ package net.peterd.soundswap.client;
 import static net.peterd.soundswap.Constants.TAG;
 
 import java.io.IOException;
-import java.net.URI;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.concurrent.CountDownLatch;
 
 import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.Preferences;
 import net.peterd.soundswap.Util;
 
 import org.apache.http.HttpResponse;
-import org.apache.http.ProtocolException;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.RedirectHandler;
 import org.apache.http.client.ResponseHandler;
@@ -24,7 +22,6 @@ import org.apache.http.cookie.Cookie;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager;
 import org.apache.http.params.HttpParams;
-import org.apache.http.protocol.HttpContext;
 
 import android.accounts.Account;
 import android.accounts.AccountManager;
@@ -48,27 +45,10 @@ public class AuthenticatedHttpClient {
   private final Context mContext;
   private final Preferences mPreferences;
   private final DefaultHttpClient mClient;
-  private final RedirectHandler mRedirectHandler;
-
-  private final RedirectHandler mAuthenticationRedirectHandler =
-      new RedirectHandler() {
-          @Override
-          public boolean isRedirectRequested(HttpResponse response,
-              HttpContext context) {
-            // Disable following redirects
-            return false;
-          }
-
-          @Override
-          public URI getLocationURI(HttpResponse response, HttpContext context)
-              throws ProtocolException {
-            return null;
-          }
-        };
 
   public AuthenticatedHttpClient(Context context,
       RedirectHandler redirectHandler) {
-    Log.i(Constants.TAG, "Initializing authenticated http client.");
+    Log.d(Constants.TAG, "Initializing authenticated http client.");
 
     mContext = context;
     mPreferences = new Preferences(context);
@@ -81,23 +61,18 @@ public class AuthenticatedHttpClient {
         params);
     mClient.getParams().setBooleanParameter(
         ClientPNames.HANDLE_REDIRECTS, false);
-    mRedirectHandler = redirectHandler == null ?
-        mClient.getRedirectHandler() : redirectHandler;
   }
 
   public <T> T request(HttpUriRequest request, ResponseHandler<T> responseProcessor) {
     Log.i(Constants.TAG, "Request (" + request.getURI() + ")");
-
-    String authCookie = mPreferences.getAuthCookie();
-    if (authCookie == null) {
-      requestAuthCookie();
-      authCookie = mPreferences.getAuthCookie();
+    if (!isAuthenticated()) {
+      authenticate();
     }
-    return doRequest(responseProcessor, request, authCookie);
+    return doRequest(responseProcessor, request);
   }
 
-  private void requestAuthCookie() {
-    Log.i(Constants.TAG, "Authenticating");
+  private void authenticate() {
+    Log.d(Constants.TAG, "Authenticating");
 
     AccountManager accountManager = AccountManager.get(mContext);
     Account account = mPreferences.getAccount();
@@ -106,25 +81,34 @@ public class AuthenticatedHttpClient {
           "before choosing an account.");
     }
 
-    CountDownLatch latch = new CountDownLatch(1);
-    accountManager.getAuthToken(account,
+    GetAuthTokenCallback callback = new GetAuthTokenCallback();
+    AccountManagerFuture<Bundle> future = accountManager.getAuthToken(account,
         Constants.AUTH_TOKEN_TYPE,
         true,  /* Notify auth failure */
-        new GetAuthTokenCallback(latch),
+        callback,
         null  /* Call back on the current thread, not a custom handler */);
 
     try {
-      latch.await();
-    } catch (InterruptedException e) {
-      Log.e(TAG, "Interrupted while updating authentication cookie.", e);
+      Log.d(Constants.TAG, "Waiting for authentication.");
+      future.getResult();
+      if (!callback.hasRun()) {
+        Log.d(Constants.TAG, "Manually running get auth token callback.");
+        callback.run(future);
+      }
+      Log.d(Constants.TAG, "Authenticated client.");
+    } catch (AuthenticatorException e) {
+      Log.e(TAG, "Error while updating authentication cookie.", e);
+    } catch (OperationCanceledException e) {
+      Log.e(TAG, "Error while updating authentication cookie.", e);
+    } catch (IOException e) {
+      Log.e(TAG, "Error while updating authentication cookie.", e);
     }
   }
 
   private <T> T doRequest(ResponseHandler<T> responseHandler,
-      HttpUriRequest request,
-      String authCookie) {
+      HttpUriRequest request) {
     try {
-      Log.i(Constants.TAG, "Doing request (" + request.getURI() + ")");
+      Log.d(Constants.TAG, "Doing request (" + request.getURI() + ")");
       return mClient.execute(request, responseHandler);
     } catch (ClientProtocolException e) {
       Log.e(TAG, "Failed to execute request.", e);
@@ -140,20 +124,19 @@ public class AuthenticatedHttpClient {
 
   private class GetAuthTokenCallback implements AccountManagerCallback<Bundle> {
 
-    private final CountDownLatch mLatch;
-
-    public GetAuthTokenCallback(CountDownLatch latch) {
-      mLatch = latch;
-    }
+    private boolean mHasRun = false;
 
     public void run(AccountManagerFuture<Bundle> result) {
+      mHasRun = true;
       Bundle bundle;
       try {
         bundle = result.getResult();
-
         String authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN);
         if (authToken != null) {
           authenticate(authToken);
+        } else {
+          Log.e(Constants.TAG, "Failed to get authentication token; failing " +
+              "authentication.");
         }
       } catch (OperationCanceledException e) {
         throw new RuntimeException("Failed to get authentication token.", e);
@@ -161,35 +144,33 @@ public class AuthenticatedHttpClient {
         throw new RuntimeException("Failed to get authentication token.", e);
       } catch (IOException e) {
         throw new RuntimeException("Failed to get authentication token.", e);
-      } finally {
-        mLatch.countDown();
       }
     }
 
+    public boolean hasRun() {
+      return mHasRun;
+    }
+
     private boolean authenticate(String authToken) {
-      Log.i(Constants.TAG, "Authenticating with token " + authToken);
-      Uri requestUri = new Uri.Builder()
-          .scheme("https")
-          .authority(Util.APPENGINE_DOMAIN)
-          .appendEncodedPath("_ah")
-          .appendEncodedPath("login")
-          .appendQueryParameter("continue", "http://localhost/")
+      Log.d(Constants.TAG, "Authenticating with token " + authToken);
+      Uri requestUri = Uri.parse(Util.HOST + "/_ah/login").buildUpon()
+          .appendQueryParameter("continue", Util.HOST)
           .appendQueryParameter("auth", authToken)
           .build();
 
       HttpGet method = new HttpGet(requestUri.toString());
       try {
-        mClient.setRedirectHandler(mAuthenticationRedirectHandler);
+        Log.d(Constants.TAG, "Requesting " + method.getURI());
         boolean authenticated =
             mClient.execute(method, new ResponseHandler<Boolean>() {
                   @Override
                   public Boolean handleResponse(HttpResponse response)
                       throws ClientProtocolException, IOException {
+                    Log.d(Constants.TAG, "Response: " + response.getStatusLine().getStatusCode() + "; " + Arrays.toString(response.getAllHeaders()));
                     return isAuthenticated();
                   }
                 });
-        mClient.setRedirectHandler(mRedirectHandler);
-        Log.i(Constants.TAG, "Authenticated: " + authenticated);
+        Log.d(Constants.TAG, "Authenticated: " + authenticated);
         return authenticated;
       } catch (ClientProtocolException e) {
         Log.e(TAG, "Failed to authenticate due to network error.", e);

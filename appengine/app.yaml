@@ -8,5 +8,8 @@ handlers:
   static_dir: static/css
 - url: /res
   static_dir: static/res
+- url: /api/.*
+  script: main.py
+  login: required
 - url: .*
   script: main.py

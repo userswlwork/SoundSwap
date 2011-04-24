@@ -2,6 +2,7 @@ package net.peterd.soundswap.syncadapter;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -69,14 +70,18 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
             @Override
             public Set<String> handleResponse(HttpResponse response)
                 throws ClientProtocolException, IOException {
+              Log.i(Constants.TAG, "List recordings response " + response.getStatusLine().getStatusCode() + "; " + Arrays.toString(response.getAllHeaders()));
+
               HttpEntity entity = response.getEntity();
-              if (entity != null) {
+              if (response.getStatusLine().getStatusCode() == 200 &&
+                  entity != null) {
                 String contents = EntityUtils.toString(entity);
                 String[] lines = contents.split("\n");
                 Set<String> set = new HashSet<String>();
                 Collections.addAll(set, lines);
                 return set;
               } else {
+                Log.e(Constants.TAG, "List recordings failed.");
                 return null;
               }
             }
@@ -117,14 +122,14 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
             + " does not exist.");
       }
 
-      Log.i(Constants.TAG, "Uploading '" + inputF + "'.");
-
       // Get the upload redirect Uri.
       String uploadUri = mClient.request(new HttpGet(Util.FORM_REDIRECT_URL),
             new ResponseHandler<String>() {
               @Override
               public String handleResponse(HttpResponse response)
                   throws ClientProtocolException, IOException {
+                Log.i(Constants.TAG, "Get upload redirect location response " + response.getStatusLine().getStatusCode() + "; " + Arrays.toString(response.getAllHeaders()));
+
                 Header[] headers = response.getHeaders(HEADER_LOCATION);
                 if (headers == null || headers.length != 1) {
                   throw new IllegalStateException(
@@ -140,12 +145,18 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
       entity.addPart("bin", body);
       HttpPost postUpload = new HttpPost(uploadUri);
 
+      Log.i(Constants.TAG, "Uploading '" + inputF + "'.");
       return mClient.request(postUpload, new ResponseHandler<Boolean>() {
             @Override
             public Boolean handleResponse(HttpResponse response)
                 throws ClientProtocolException, IOException {
-              Log.i(Constants.TAG, "Finished uploading '" + inputF + "'.");
-              return true;
+              int status = response.getStatusLine().getStatusCode();
+              if (status == 200 || status == 302) {
+                return true;
+              } else {
+                Log.e(Constants.TAG, "Failed to upload file; response code " + status + "; " + response.getStatusLine().getReasonPhrase());
+                return false;
+              }
             }
           });
     }

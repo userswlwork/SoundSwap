@@ -11,8 +11,8 @@ from google.appengine.ext import db
 
 
 class Recording(db.Model):
+  user = db.UserProperty(auto_current_user_add=True)
   location = db.GeoPtProperty()
-  device_id = db.StringProperty()
   blob = blobstore.BlobReferenceProperty()
   created_time = db.DateTimeProperty()
   

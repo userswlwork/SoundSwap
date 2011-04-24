@@ -16,11 +16,13 @@
 
 package net.peterd.soundswap.syncadapter;
 
+import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.Preferences;
 import android.accounts.Account;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
+import android.util.Log;
 
 /**
  * Service to handle Account sync. This is invoked with an intent with action
@@ -34,16 +36,19 @@ public class SyncService extends Service {
 
     @Override
     public void onCreate() {
-        synchronized (sSyncAdapterLock) {
-            if (sSyncAdapter == null) {
-                sSyncAdapter = new SyncAdapter(getApplicationContext(), true);
-            }
+      super.onCreate();
+      Log.i(Constants.TAG, "SyncService#onCreate");
+      synchronized (sSyncAdapterLock) {
+        if (sSyncAdapter == null) {
+            sSyncAdapter = new SyncAdapter(getApplicationContext(), true);
         }
+      }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
       super.onStartCommand(intent, flags, startId);
+      Log.i(Constants.TAG, "SyncService#onStartCommand");
       Preferences preferences = new Preferences(this);
       Account account = preferences.getAccount();
       if (account != null) {

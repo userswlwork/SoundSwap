@@ -30,8 +30,6 @@ import android.util.Log;
 
 public class FetchActivity extends AuthenticatedActivity {
 
-  public static final String FETCH_URI_EXTRA = "fetch_uri";
-
   @Override
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -41,15 +39,6 @@ public class FetchActivity extends AuthenticatedActivity {
   @Override
   public void onResume() {
     super.onResume();
-
-    Intent intent = getIntent();
-
-    Uri fetchUri;
-    if (intent.hasExtra(FETCH_URI_EXTRA)) {
-      fetchUri = Uri.parse(intent.getStringExtra(FETCH_URI_EXTRA));
-    } else {
-      fetchUri = getFetchSoundUri();
-    }
 
     ProgressDialog dialog = new ProgressDialog(this);
     final Fetcher fetcher = new Fetcher(this,
@@ -80,13 +69,7 @@ public class FetchActivity extends AuthenticatedActivity {
     });
     dialog.show();
 
-    fetcher.execute(fetchUri);
-  }
-
-  private Uri getFetchSoundUri() {
-    return Uri.parse(Util.FETCH_SOUND_URL).buildUpon()
-        .appendQueryParameter(Util.DEVICE_ID_URI_KEY, Util.getDeviceId(this))
-        .build();
+    fetcher.execute(Uri.parse(Util.FETCH_SOUND_URL));
   }
 
   private static class Fetcher extends AsyncTask<Uri, Double, File> {

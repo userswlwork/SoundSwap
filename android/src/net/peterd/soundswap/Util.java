@@ -2,7 +2,6 @@ package net.peterd.soundswap;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicReference;
 
 import android.accounts.Account;
 import android.app.AlertDialog;
@@ -12,20 +11,16 @@ import android.content.DialogInterface;
 import android.media.AudioFormat;
 import android.media.MediaPlayer;
 import android.os.Environment;
-import android.telephony.TelephonyManager;
 import android.util.Log;
 
 public class Util {
 
-  private static final AtomicReference<String> mDeviceId =
-      new AtomicReference<String>(null);
-
-  public static final String APPENGINE_DOMAIN = "sound-swap.appspot.com"; // "10.1.10.12:8080";
+  public static final String APPENGINE_DOMAIN = "sound-swap.appspot.com";
   public static final String HOST = "http://" + APPENGINE_DOMAIN;
+  public static final String HOST_SECURE = "https://" + APPENGINE_DOMAIN;
   public static final String FORM_REDIRECT_URL = HOST + "/api/sound/upload_form_redirect";
   public static final String FETCH_SOUND_URL = HOST + "/api/sound";
   public static final String LIST_SOUNDS_URL = HOST + "/api/sound/list";
-  public static final String DEVICE_ID_URI_KEY = "device_id";
 
   public static final String TEMP_DIR = "temp";
   public static final String FETCHED_DIR = "fetched";
@@ -75,28 +70,12 @@ public class Util {
       long timeMillis,
       int latitudeE6,
       int longitudeE6) {
-    String deviceId = getDeviceId(context);
     return new StringBuilder()
-        .append(deviceId).append("_")
         .append(timeMillis).append("_")
         .append(latitudeE6).append("_")
         .append(longitudeE6)
         .append(".").append(RECORDING_FILE_EXTENSION)
         .toString();
-  }
-
-  public static String getDeviceId(Context context) {
-    String deviceId = mDeviceId.get();
-    if (deviceId == null) {
-      TelephonyManager manager = (TelephonyManager) context.getSystemService(
-          Context.TELEPHONY_SERVICE);
-      deviceId = manager.getDeviceId();
-      if (deviceId == null) {
-        deviceId = "null";
-      }
-      mDeviceId.set(deviceId);
-    }
-    return deviceId;
   }
 
   /**

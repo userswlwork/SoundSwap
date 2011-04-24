@@ -16,7 +16,6 @@ _UPLOAD_FORM_REDIRECT_PATH = "/api/sound/upload_form_redirect"
 _UPLOAD_SOUND_BASE_PATH = "/api/sound/upload"
 _GET_SOUND_PATH = "/api/sound"
 
-_DEVICE_ID_URI_KEY = "device_id"
 
 def GetRandomNumber():
   """

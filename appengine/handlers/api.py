@@ -10,6 +10,7 @@ import logging
 from handlers import common
 from models import recording
 
+from google.appengine.api import users
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import webapp
@@ -22,11 +23,18 @@ class GetBlobUploadHandler(webapp.RequestHandler):
     self.redirect(upload_url)
 
 
+class GetMyRecordingsHandler(webapp.RequestHandler):
+  def get(self):
+    user = users.get_current_user()
+    query = recording.Recording.all()
+    query.filter("user = ", user)
+    self.response.out.write("\n".join(map(lambda rec: rec.blob.filename, 
+                                          query)))
+    
+
 class GetRecordingHandler(blobstore_handlers.BlobstoreDownloadHandler):
   def get(self):
-    device_id = self.request.get(common._DEVICE_ID_URI_KEY)
-    if device_id is not None and device_id == "null":
-      device_id = None
+    user = users.get_current_user()
     
     for attempt in xrange(100):
       logging.debug("Fetch attempt %d" % attempt)
@@ -44,8 +52,8 @@ class GetRecordingHandler(blobstore_handlers.BlobstoreDownloadHandler):
       recordings.order("%srandom_number" % order)
       
       for record in recordings.fetch(limit=1000):
-        if device_id is not None and record.device_id == device_id:
-          logging.debug("Skipping record due to device id.")
+        if record.user == user:
+          logging.debug("Skipping record due to user id.")
           continue
         self.response.headers.add_header("X-SoundSwap-Filename", 
                                          record.blob.filename)
@@ -55,7 +63,7 @@ class GetRecordingHandler(blobstore_handlers.BlobstoreDownloadHandler):
     # TODO: redirect to a standard file
     logging.error("No sounds available for request.")
     self.redirect("/")
-
+    
 
 class SoundUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
   def post(self):
@@ -70,13 +78,11 @@ class SoundUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
     upload_key = upload.key()
     assert upload_key is not None
 
-    device_id = None
     time_ms = None
     latE6 = None
     lonE6 = None
     
     if self.request.get("from_web") == "True":
-      device_id = self.request.get("device_id")
       time_ms = int(self.request.get("time_ms"))
       latE6 = int(self.request.get("latE6"))
       lonE6 = int(self.request.get("lonE6"))
@@ -84,12 +90,10 @@ class SoundUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
       # Sample filename: 1300058598218_37765137_-122450695.wav.zip
       filename = upload.filename
       parts = filename.split(".")[0].split("_")
-      device_id = parts[0]
-      time_ms = int(parts[1])
-      latE6 = int(parts[2])
-      lonE6 = int(parts[3])
+      time_ms = int(parts[0])
+      latE6 = int(parts[1])
+      lonE6 = int(parts[2])
     
-    assert device_id is not None
     assert time_ms is not None
     assert lonE6 is not None
     assert latE6 is not None
@@ -97,15 +101,11 @@ class SoundUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
     location = db.GeoPt(latE6 / 1E6, lonE6 / 1E6)
     created_time = datetime.datetime.fromtimestamp((int) (time_ms/1000))
     
-    record = recording.Recording(device_id = device_id,
-                                 location = location,
+    record = recording.Recording(location = location,
                                  created_time = created_time,
                                  blob = upload_key,
                                  random_number = common.GetRandomNumber())
     record.put()
     
-    redirect_uri = ("%s?%s=%s" % 
-                    (common._GET_SOUND_PATH, 
-                     common._DEVICE_ID_URI_KEY, 
-                     device_id))
-    self.redirect(redirect_uri)
+    # TODO(peterdolan): Redirect to an appropriate location, for web form users
+    self.redirect("/")

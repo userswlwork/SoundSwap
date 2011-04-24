@@ -4,6 +4,7 @@ import java.io.File;
 
 import net.peterd.soundswap.Preferences;
 import net.peterd.soundswap.Util;
+import net.peterd.soundswap.syncadapter.SyncService;
 import android.accounts.Account;
 import android.app.ListActivity;
 import android.content.Intent;
@@ -27,6 +28,8 @@ public class RecordingsListActivity extends ListActivity {
         android.R.layout.activity_list_item,
         android.R.id.text1,
         files));
+
+    startService(new Intent(this, SyncService.class));
   }
 
   @Override
