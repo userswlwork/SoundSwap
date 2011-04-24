@@ -1,10 +1,12 @@
 package net.peterd.soundswap.syncadapter;
 
 import net.peterd.soundswap.Preferences;
+import net.peterd.soundswap.R;
 import android.accounts.Account;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
+import android.widget.Toast;
 
 /**
  * Service to handle Account sync. This is invoked with an intent with action
@@ -29,17 +31,22 @@ public class SyncService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
       super.onStartCommand(intent, flags, startId);
-      Preferences preferences = new Preferences(this);
-      Account account = preferences.getAccount();
-      if (account != null) {
-        synchronized (sSyncAdapterLock) {
-          sSyncAdapter.onPerformSync(account,
-              null,
-              null,
-              null,
-              null);
-        }
-      }
+      final Preferences preferences = new Preferences(this);
+      new Thread(new Runnable() {
+            public void run() {
+              Account account = preferences.getAccount();
+              if (account != null) {
+                synchronized (sSyncAdapterLock) {
+                  sSyncAdapter.onPerformSync(account,
+                      null,
+                      null,
+                      null,
+                      null);
+                }
+              }
+            }
+          });
+      Toast.makeText(this, R.string.synchronizing, Toast.LENGTH_LONG).show();
       return START_NOT_STICKY;
     }
 

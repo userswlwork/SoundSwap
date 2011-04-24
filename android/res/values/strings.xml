@@ -21,10 +21,13 @@
     <string name="recording">Recording...</string>
     <string name="compressing">Compressing...</string>
     <string name="fetching">Downloading...</string>
+    <string name="synchronizing">Synchronizing...</string>
     
     <string name="no_accounts">No Accounts</string>
-    
-    
+
+    <string name="menu_recordings">Home</string>    
+    <string name="menu_record">Record</string>
+    <string name="menu_synchronize">Synchronize</string>
     
     <!-- Authentication-related -->
     

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+  <item android:id="@+id/menu_recordings"
+      android:icon="@android:drawable/ic_menu_recent_history"
+      android:title="@string/menu_recordings" />
+  <item android:id="@+id/menu_sync"
+      android:icon="@android:drawable/ic_menu_upload"
+      android:title="@string/menu_synchronize" />
+  <item android:id="@+id/menu_record"
+      android:icon="@android:drawable/ic_btn_speak_now"
+      android:title="@string/menu_record" />
+</menu>
