@@ -47,8 +47,6 @@ public class AuthenticatedHttpClient {
 
   public AuthenticatedHttpClient(Context context,
       RedirectHandler redirectHandler) {
-    Log.d(Constants.TAG, "Initializing authenticated http client.");
-
     mContext = context;
     mPreferences = new Preferences(context);
 

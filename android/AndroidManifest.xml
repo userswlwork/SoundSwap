@@ -29,6 +29,7 @@
             <meta-data android:name="android.content.SyncAdapter"
                 android:resource="@xml/syncadapter" />
         </service>
+        <service android:name=".soundservice.RecordService" android:exported="false" />
 		<receiver android:name=".syncadapter.SyncTimer"
 		  android:enabled="true"
 		  android:exported="false"

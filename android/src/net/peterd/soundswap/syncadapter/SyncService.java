@@ -1,5 +1,8 @@
 package net.peterd.soundswap.syncadapter;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
 import net.peterd.soundswap.Preferences;
 import net.peterd.soundswap.R;
 import android.accounts.Account;
@@ -18,6 +21,8 @@ public class SyncService extends Service {
     private static final Object sSyncAdapterLock = new Object();
     private static SyncAdapter sSyncAdapter = null;
 
+    private final Executor mExecutor = Executors.newSingleThreadExecutor();
+
     @Override
     public void onCreate() {
       super.onCreate();
@@ -32,7 +37,7 @@ public class SyncService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
       super.onStartCommand(intent, flags, startId);
       final Preferences preferences = new Preferences(this);
-      new Thread(new Runnable() {
+      mExecutor.execute(new Runnable() {
             public void run() {
               Account account = preferences.getAccount();
               if (account != null) {

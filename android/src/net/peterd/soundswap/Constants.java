@@ -16,6 +16,7 @@
 
 package net.peterd.soundswap;
 
+import android.location.Criteria;
 import android.media.AudioFormat;
 
 public class Constants {
@@ -42,4 +43,16 @@ public class Constants {
   public static final String FORM_REDIRECT_URL = HOST + "/api/sound/upload_form_redirect";
   public static final String FETCH_SOUND_URL = HOST + "/api/sound";
   public static final String LIST_SOUNDS_URL = HOST + "/api/sound/list";
+
+  public static final Criteria LOCATION_CRITERIA;
+  static {
+    Criteria criteria = new Criteria();
+    criteria.setAccuracy(Criteria.ACCURACY_COARSE);
+    criteria.setAltitudeRequired(false);
+    criteria.setBearingRequired(false);
+    criteria.setCostAllowed(true);
+    criteria.setPowerRequirement(Criteria.NO_REQUIREMENT);
+    criteria.setSpeedRequired(false);
+    LOCATION_CRITERIA = criteria;
+  }
 }

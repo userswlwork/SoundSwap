@@ -39,7 +39,7 @@ public class ChooseAccountActivity extends ListActivity {
 
     Account account = mPreferences.getAccount();
     if (account != null && accounts.contains(account)) {
-      proceed();
+      selectAccount(account);
     } else {
       setListAdapter(new ArrayAdapter<Account>(this,
           R.layout.account_list_item, accounts));
@@ -50,13 +50,19 @@ public class ChooseAccountActivity extends ListActivity {
   public void onActivityResult(int requestCode, int resultCode, Intent data) {
     // TODO: figure out what happens when the user says "no" to permission to
     // use their account.
-    data.toString();
+    if (resultCode == RESULT_OK) {
+      proceed();
+    } else {
+      finish();
+    }
   }
 
   @Override
   protected void onListItemClick(ListView l, View v, int position, long id) {
-    Account account = (Account) getListView().getItemAtPosition(position);
+    selectAccount((Account) getListView().getItemAtPosition(position));
+  }
 
+  private void selectAccount(Account account) {
     // TODO: set the account only after we get confirmation that we are
     // authorized to use the account.
     mPreferences.putAccount(account);
