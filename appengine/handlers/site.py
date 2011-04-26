@@ -35,8 +35,8 @@ class UploadHandler(AuthenticatedHandler):
     
     upload_url = blobstore.create_upload_url(common._UPLOAD_SOUND_BASE_PATH)
     self.OutputTemplate({"upload_url": upload_url}, "upload.html")
-    
-    
+
+
 class ListHandler(AuthenticatedHandler):
   
   def get(self):
@@ -45,6 +45,6 @@ class ListHandler(AuthenticatedHandler):
       return
     
     user = users.get_current_user()
-    recordings = recording.Recording.all().filter("device_id != ", user.email())
+    recordings = recording.Recording.all().filter("user != ", user.email())
     
     self.OutputTemplate({"recordings": recordings}, "list.html")

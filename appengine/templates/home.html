@@ -1,4 +1,9 @@
 {% extends "base.html" %}
 {% block body %}
 <h1>SoundSwap</h1>
+{% if logged_in %}
+<ul>
+  <li><a href="/sound/list">My Recordings</a></li>
+</ul>
+{% endif %}
 {% endblock %}

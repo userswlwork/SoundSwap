@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block body %}
 
+<ul>
 {% for recording in recordings %}
-
+  <li><a href="/api/sound/{{ recording.blob.key }}">Created {{ recording.created_time }}, at {{ recording.location.lat }}, {{recording.location.lon }}</a></li>
 {% endfor %}
+</ul>
 
 {% endblock %}

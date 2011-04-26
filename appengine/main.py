@@ -11,9 +11,10 @@ from google.appengine.ext.webapp import util
 def main():
   application = webapp.WSGIApplication(
       [("/", site.HomepageHandler),
-       ("/api/sound", api.GetRecordingHandler),
        ("/api/sound/list", api.GetMyRecordingsHandler),
        ("/api/sound/upload_form_redirect", api.GetBlobUploadHandler),
+       ("/api/sound", api.GetRecordingHandler),
+       ("/api/sound/([^/]+)", api.GetRecordingBlobHandler),
        (common._UPLOAD_SOUND_BASE_PATH, api.SoundUploadHandler),
        ("/sound/upload", site.UploadHandler),
        ("/sound/list", site.ListHandler),

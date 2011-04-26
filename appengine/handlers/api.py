@@ -6,6 +6,7 @@ Created on Apr 3, 2011
 
 import datetime
 import logging
+import urllib
 
 from handlers import common
 from models import recording
@@ -63,6 +64,18 @@ class GetRecordingHandler(blobstore_handlers.BlobstoreDownloadHandler):
     # TODO: redirect to a standard file
     logging.error("No sounds available for request.")
     self.redirect("/")
+
+
+class GetRecordingBlobHandler(blobstore_handlers.BlobstoreDownloadHandler):
+  def get(self, resource):
+    resource = str(urllib.unquote(resource))
+    blob_info = blobstore.BlobInfo.get(resource)
+    
+    content_type = blob_info.content_type
+    if blob_info.content_type == "application/octet-stream":
+      if blob_info.filename.endswith("wav"):
+        content_type = "audio/wav"
+    self.send_blob(blob_info, content_type=content_type)
     
 
 class SoundUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
