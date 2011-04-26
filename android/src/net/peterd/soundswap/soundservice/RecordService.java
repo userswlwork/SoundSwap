@@ -36,6 +36,8 @@ import android.util.Log;
 
 public class RecordService extends Service implements LocationListener {
 
+  private static final int ONGOING_RECORDING = 1;
+
   private Preferences mPreferences;
 
   ProgressDialog mWaitingForLocationDialog;
@@ -47,13 +49,19 @@ public class RecordService extends Service implements LocationListener {
   private File mAudioFile;
   private long mAudioFileStartTimeMs;
 
-  private boolean mIsRecording = false;
-
   private final Executor mExecutor = Executors.newSingleThreadExecutor();
+
+  @Override
+  public int onStartCommand(Intent intent, int flags, int startId) {
+    // We want this service to continue running until it is explicitly
+    // stopped, so return sticky.
+    return START_STICKY;
+  }
 
   @Override
   public void onCreate() {
     super.onCreate();
+    Log.d(TAG, "RecordService#onCreate()");
     mPreferences = new Preferences(this);
     if (getAccount() == null) {
       throw new IllegalStateException("Cannot start recording service " +
@@ -63,7 +71,19 @@ public class RecordService extends Service implements LocationListener {
   }
 
   @Override
+  public void onDestroy() {
+    super.onDestroy();
+    Log.d(TAG, "RecordService#onDestroy()");
+    if (isRecording()) {
+      Log.e(TAG, "Destroying record service while recording.");
+      stopRecording(null);
+    }
+  }
+
+  @Override
   public IBinder onBind(Intent intent) {
+    Log.d(TAG, "RecordService#onBind()");
+
     String bestProvider = mLocationManager.getBestProvider(
         Constants.LOCATION_CRITERIA, true);
     if (bestProvider == null) {
@@ -82,17 +102,9 @@ public class RecordService extends Service implements LocationListener {
     return new RecordBinder();
   }
 
-  @Override
-  public boolean onUnbind(Intent intent) {
-    mLocationManager.removeUpdates(this);
-    return true;
-  }
-
   private Account getAccount() {
     return mPreferences.getAccount();
   }
-
-  private static final int ONGOING_RECORDING = 0;
 
   /**
    * Begin recording audio to a temporary file for a certain amount of time,
@@ -102,6 +114,10 @@ public class RecordService extends Service implements LocationListener {
    *         otherwise
    */
   public synchronized boolean startRecording() {
+    if (isRecording()) {
+      throw new IllegalStateException("Already recording, cannot start again.");
+    }
+
     Log.i(Constants.TAG, "Starting recording.");
     try {
       mAudioFile = File.createTempFile("audio", "."
@@ -115,17 +131,16 @@ public class RecordService extends Service implements LocationListener {
     mRecorder = new Recorder(mAudioFile);
     mExecutor.execute(mRecorder);
     mAudioFileStartTimeMs = System.currentTimeMillis();
-    mIsRecording = true;
 
     Notification notification = new Notification(R.drawable.icon,
         getText(R.string.recording),
         System.currentTimeMillis());
-    Intent notificationIntent = new Intent(this, RecordActivity.class);
     PendingIntent pendingIntent = PendingIntent.getActivity(this,
         0,
-        notificationIntent,
+        new Intent(this, RecordActivity.class),
         0);
-    notification.setLatestEventInfo(this, getText(R.string.recording),
+    notification.setLatestEventInfo(this,
+        getText(R.string.recording),
         getText(R.string.recording),
         pendingIntent);
     startForeground(ONGOING_RECORDING, notification);
@@ -137,8 +152,12 @@ public class RecordService extends Service implements LocationListener {
   /**
    * Stop the current recording, and move the temporary file to one that has
    * encoded the time, and location.
+   *
+   * @param callback a {@link Runnable} to be run when the service has finished
+   *                 stopping the recording, or {@code null} if no notification
+   *                 is necessary.
    */
-  public void stopRecording(Runnable callback) {
+  public synchronized void stopRecording(Runnable callback) {
     Log.i(Constants.TAG, "Stopping recording.");
 
     if (mRecorder == null) {
@@ -156,8 +175,8 @@ public class RecordService extends Service implements LocationListener {
     Log.i(Constants.TAG, "Stopped recording.");
 
     if (mLatestLocation == null) {
-      // Wait for location.
-      // TODO(peterdolan): Need to figure out how to wait for a location.
+      // TODO(peterdolan): wait for location, and if canceled, maintain file
+      // with null location.
       Log.e(Constants.TAG, "Didn't have a location by the time we stopped " +
           "recording; dropping file.");
     } else {
@@ -165,13 +184,18 @@ public class RecordService extends Service implements LocationListener {
       renameTempFile();
       Log.i(Constants.TAG, "Renamed temporary file.");
     }
+    mLocationManager.removeUpdates(this);
 
     stopForeground(true);
-    callback.run();
+    if (callback != null) {
+      callback.run();
+    }
   }
 
   public synchronized boolean isRecording() {
-    return mIsRecording;
+    Log.d(TAG, "RecordService#isRecording(); " +
+        Boolean.toString(mRecorder != null));
+    return mRecorder != null;
   }
 
   public synchronized long getRecordingLengthMs() {

@@ -6,7 +6,6 @@ import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.R;
 import net.peterd.soundswap.soundservice.RecordService;
 import android.app.AlertDialog;
-import android.app.ProgressDialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -15,15 +14,17 @@ import android.content.ServiceConnection;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Toast;
 
 public class RecordActivity extends AuthenticatedActivity {
 
   private final Object mServiceLock = new Object();
   private RecordService.RecordBinder mBinder;
+
   private Button mStartRecordingButton;
+  private Button mStopRecordingButton;
 
   private final ServiceConnection mServiceConnection = new ServiceConnection() {
 
@@ -31,9 +32,10 @@ public class RecordActivity extends AuthenticatedActivity {
     public void onServiceConnected(ComponentName component, IBinder binder) {
       synchronized (mServiceLock) {
         mBinder = (RecordService.RecordBinder) binder;
-        mStartRecordingButton.setEnabled(true);
         if (mBinder.getService().isRecording()) {
-          showRecordingDialog();
+          setViewToRecording();
+        } else {
+          mStartRecordingButton.setEnabled(true);
         }
       }
     }
@@ -42,7 +44,10 @@ public class RecordActivity extends AuthenticatedActivity {
     public void onServiceDisconnected(ComponentName component) {
       synchronized (mServiceLock) {
         mBinder = null;
-        mStartRecordingButton.setEnabled(false);
+        Toast.makeText(RecordActivity.this,
+            getString(R.string.error_recording_failed),
+            Toast.LENGTH_LONG).show();
+        finish();
       }
     }
   };
@@ -57,20 +62,26 @@ public class RecordActivity extends AuthenticatedActivity {
     mStartRecordingButton.setOnClickListener(new View.OnClickListener() {
           @Override
           public void onClick(View v) {
-            try {
-              startRecording();
-            } catch (RemoteException e) {
-              // TODO(peterdolan): handle with UI messaging
-              throw new RuntimeException(e);
-            }
+            startRecording();
           }
         });
-    mStartRecordingButton.setEnabled(false);
+
+    mStopRecordingButton = (Button) findViewById(R.id.record_stop);
+    mStopRecordingButton.setOnClickListener(new View.OnClickListener() {
+          @Override
+          public void onClick(View arg0) {
+            stopRecording();
+          }
+        });
+    mStopRecordingButton.setVisibility(View.GONE);
+
+    startService(new Intent(this, RecordService.class));
   }
 
   @Override
-  public void onResume() {
-    super.onResume();
+  public void onStart() {
+    super.onStart();
+    mStartRecordingButton.setEnabled(false);
 
     LocationManager locationManager =
         (LocationManager) getSystemService(LOCATION_SERVICE);
@@ -94,7 +105,6 @@ public class RecordActivity extends AuthenticatedActivity {
                   finish();
                 }
               }).show();
-      return;
     }
 
     bindService(new Intent(this, RecordService.class),
@@ -103,39 +113,25 @@ public class RecordActivity extends AuthenticatedActivity {
   }
 
   @Override
-  public void onPause() {
+  public void onStop() {
     super.onPause();
     unbindService(mServiceConnection);
   }
 
-  private void startRecording() throws RemoteException {
+  private void startRecording() {
     mStartRecordingButton.setEnabled(false);
     synchronized (mServiceLock) {
       mBinder.getService().startRecording();
     }
-    showRecordingDialog();
+    setViewToRecording();
   }
 
-  private void showRecordingDialog() {
-    ProgressDialog recordingDialog = new ProgressDialog(this);
-    recordingDialog.setCancelable(false);
-    recordingDialog.setMessage(getString(R.string.recording));
-    recordingDialog.setButton(getString(R.string.record_stop),
-        new DialogInterface.OnClickListener() {
-          @Override
-          public void onClick(DialogInterface dialog, int which) {
-            try {
-              stopRecording();
-            } catch (RemoteException e) {
-              // TODO(peterdolan): handle this with UI messaging
-              throw new RuntimeException(e);
-            }
-          }
-        });
-    recordingDialog.show();
+  private void setViewToRecording() {
+    mStartRecordingButton.setVisibility(View.GONE);
+    mStopRecordingButton.setVisibility(View.VISIBLE);
   }
 
-  private void stopRecording() throws RemoteException {
+  private void stopRecording() {
     Runnable callback = new Runnable() {
       @Override
       public void run() {
@@ -150,5 +146,7 @@ public class RecordActivity extends AuthenticatedActivity {
       mBinder.getService().stopRecording(callback);
     }
     mStartRecordingButton.setEnabled(true);
+
+    stopService(new Intent(this, RecordService.class));
   }
 }

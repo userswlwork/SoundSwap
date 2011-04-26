@@ -14,31 +14,25 @@ public final class R {
         public static final int icon=0x7f020000;
     }
     public static final class id {
-        public static final int accept=0x7f07000a;
-        public static final int fetch_sound=0x7f070008;
-        public static final int menu_record=0x7f07000e;
-        public static final int menu_recordings=0x7f07000c;
-        public static final int menu_sync=0x7f07000d;
-        public static final int message=0x7f070000;
-        public static final int message_bottom=0x7f070004;
-        public static final int ok_button=0x7f070005;
-        public static final int password_edit=0x7f070003;
-        public static final int play=0x7f070006;
-        public static final int record_new=0x7f070007;
-        public static final int record_retry=0x7f07000b;
-        public static final int record_start=0x7f070009;
-        public static final int username_edit=0x7f070001;
-        public static final int username_fixed=0x7f070002;
+        public static final int accept=0x7f070005;
+        public static final int fetch_sound=0x7f070002;
+        public static final int menu_record=0x7f070009;
+        public static final int menu_recordings=0x7f070007;
+        public static final int menu_sync=0x7f070008;
+        public static final int play=0x7f070000;
+        public static final int record_new=0x7f070001;
+        public static final int record_retry=0x7f070006;
+        public static final int record_start=0x7f070003;
+        public static final int record_stop=0x7f070004;
     }
     public static final class layout {
         public static final int account_list_item=0x7f030000;
         public static final int compress=0x7f030001;
         public static final int fetch=0x7f030002;
-        public static final int login_activity=0x7f030003;
-        public static final int play_fetched=0x7f030004;
-        public static final int record=0x7f030005;
-        public static final int recording_list_item=0x7f030006;
-        public static final int review=0x7f030007;
+        public static final int play_fetched=0x7f030003;
+        public static final int record=0x7f030004;
+        public static final int recording_list_item=0x7f030005;
+        public static final int review=0x7f030006;
     }
     public static final class menu {
         public static final int main_menu=0x7f060000;
@@ -46,79 +40,25 @@ public final class R {
     public static final class string {
         public static final int accept=0x7f050008;
         public static final int app_name=0x7f050000;
-        /**  Button for going to the previous screen or step 
-         */
-        public static final int back_button_label=0x7f050024;
         public static final int cancel=0x7f050009;
-        /**  Button to cancel the current operation 
-         */
-        public static final int cancel_button_label=0x7f050025;
         public static final int compressing=0x7f05000e;
         public static final int disappointed_but_okay=0x7f05000a;
         public static final int error_playing=0x7f050007;
+        public static final int error_recording_failed=0x7f050015;
         public static final int fetch_sound=0x7f050005;
         public static final int fetching=0x7f05000f;
         public static final int location_device_error=0x7f05000b;
-        /**  Message shown in dialog if the username or password is invalid. 
-         */
-        public static final int login_activity_loginfail_text_both=0x7f05001f;
-        /**  Message shown in dialog to prompt the user for their password 
-         */
-        public static final int login_activity_loginfail_text_pwmissing=0x7f050021;
-        /**  Message shown in dialog if the password is invalid 
-         */
-        public static final int login_activity_loginfail_text_pwonly=0x7f050020;
-        /** 
-        Message shown if the provided account doesn't support the current
-        activity.
-    
-         */
-        public static final int login_activity_newaccount_text=0x7f050022;
-        /**  Button to sign in after entering username and password 
-         */
-        public static final int login_activity_ok_button=0x7f05001e;
-        /**  Label above password EditText 
-         */
-        public static final int login_activity_password_label=0x7f05001d;
-        /**  Label above username EditText 
-         */
-        public static final int login_activity_username_label=0x7f05001c;
         public static final int menu_record=0x7f050013;
         public static final int menu_recordings=0x7f050012;
         public static final int menu_synchronize=0x7f050014;
         public static final int no_accounts=0x7f050011;
-        public static final int notification_login_error=0x7f050019;
-        /**  Permission description 
-         */
-        public static final int permdesc_samplesyncadapterAuth=0x7f050018;
-        /**  Permission description 
-         */
-        public static final int permdesc_samplesyncadapterAuthPassword=0x7f050016;
-        /**  Permission label 
-         */
-        public static final int permlab_samplesyncadapterAuth=0x7f050017;
-        /**  Authentication-related 
- Permission label 
-         */
-        public static final int permlab_samplesyncadapterAuthPassword=0x7f050015;
         public static final int play=0x7f050006;
-        public static final int profile_action=0x7f050026;
         public static final int record_new=0x7f050004;
         public static final int record_retry=0x7f050003;
         public static final int record_start=0x7f050001;
         public static final int record_stop=0x7f050002;
         public static final int recording=0x7f05000d;
-        /**  Button that takes the user to the "sign in" screen 
-         */
-        public static final int sign_in_button_label=0x7f050023;
         public static final int synchronizing=0x7f050010;
-        /**  Message shown in progress dialog while app connects to the server 
-         */
-        public static final int ui_activity_authenticating=0x7f05001b;
-        /**  Title string for Login activity
-         */
-        public static final int ui_activity_title=0x7f05001a;
-        public static final int view_profile=0x7f050027;
         public static final int waiting_for_location=0x7f05000c;
     }
     public static final class xml {
