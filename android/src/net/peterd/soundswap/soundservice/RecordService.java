@@ -3,13 +3,10 @@ package net.peterd.soundswap.soundservice;
 import static net.peterd.soundswap.Constants.TAG;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicReference;
 
 import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.Preferences;
@@ -25,13 +22,9 @@ import android.content.Intent;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.media.AudioFormat;
-import android.media.AudioRecord;
-import android.media.MediaRecorder;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.Process;
 import android.util.Log;
 
 public class RecordService extends Service implements LocationListener {
@@ -208,121 +201,6 @@ public class RecordService extends Service implements LocationListener {
 
   public synchronized File getRecordedFile() {
     return mAudioFile;
-  }
-
-  private static class Recorder implements Runnable {
-
-    private final AtomicReference<CountDownLatch> mStopLatch =
-        new AtomicReference<CountDownLatch>();
-    private final File mOutputFile;
-
-    public Recorder(File outputFile) {
-      mOutputFile = outputFile;
-    }
-
-    @Override
-    public void run() {
-      Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
-
-      try {
-        RandomAccessFile output = new RandomAccessFile(mOutputFile, "rw");
-
-        short bSamples = Constants.RECORDING_ENCODING ==
-            AudioFormat.ENCODING_PCM_16BIT ? 16 : 8;
-
-        // Write file header.
-        try {
-          output.setLength(0); // Set file length to 0, to prevent unexpected
-                               // behavior in case the file already existed
-          output.writeBytes("RIFF");
-          output.writeInt(0); // Final file size not known yet, write 0
-          output.writeBytes("WAVE");
-          output.writeBytes("fmt ");
-          output.writeInt(Integer.reverseBytes(16)); // Sub-chunk size, 16 for
-                                                     // PCM
-          output.writeShort(Short.reverseBytes((short) 1)); // AudioFormat, 1
-                                                            // for PCM
-          output.writeShort(Short.reverseBytes((short) 1)); // Number of
-                                                            // channels, 1 for
-                                                            // mono
-          // Sample rate
-          output.writeInt(Integer.reverseBytes(Constants.RECORDING_SAMPLE_RATE));
-          output.writeInt(Integer.reverseBytes(Constants.RECORDING_SAMPLE_RATE
-              * bSamples / 8)); // Byte rate,
-                                // SampleRate*NumberOfChannels*BitsPerSample/8
-          output.writeShort(Short.reverseBytes((short) (bSamples / 8))); // Block
-                                                                         // align,
-                                                                         // NumberOfChannels*BitsPerSample/8
-          output.writeShort(Short.reverseBytes(bSamples)); // Bits per sample
-          output.writeBytes("data");
-          output.writeInt(0); // Data chunk size not known yet, write 0
-        } catch (IOException e) {
-          Log.e(TAG, "Failed to write wav file header.", e);
-          return;
-        }
-
-        int bufferSize = AudioRecord.getMinBufferSize(
-            Constants.RECORDING_SAMPLE_RATE,
-            Constants.RECORDING_CHANNEL,
-            Constants.RECORDING_ENCODING);
-
-        AudioRecord audioRecord = new AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            Constants.RECORDING_SAMPLE_RATE,
-            Constants.RECORDING_CHANNEL,
-            Constants.RECORDING_ENCODING,
-            bufferSize);
-
-        short[] buffer = new short[bufferSize];
-
-        audioRecord.startRecording();
-
-        int payloadSize = 0;
-        while (mStopLatch.get() == null) {
-          int bufferReadResult = audioRecord.read(buffer, 0, bufferSize);
-
-          if (bufferReadResult == AudioRecord.ERROR_INVALID_OPERATION) {
-            throw new IllegalStateException("Invalid audiorecord read "
-                + "operation.");
-          } else if (bufferReadResult == AudioRecord.ERROR_BAD_VALUE) {
-            throw new IllegalStateException("Audiorecord read " + "bad value.");
-          }
-
-          for (int i = 0; i < bufferReadResult; i++) {
-            try {
-              output.writeShort(Short.reverseBytes(buffer[i]));
-            } catch (IOException e) {
-              Log.e(TAG, "Could not write to output stream.");
-            }
-          }
-
-          payloadSize += bufferReadResult * (bSamples / 8);
-        }
-
-        audioRecord.stop();
-
-        // Update wav file header and close it.
-
-        try {
-          output.seek(4); // Write size to RIFF header
-          output.writeInt(Integer.reverseBytes(36 + payloadSize));
-          output.seek(40); // Write size to Subchunk2Size field
-          output.writeInt(Integer.reverseBytes(payloadSize));
-          output.close();
-        } catch (IOException e) {
-          Log.e(TAG, "Could not close output file.");
-        }
-      } catch (FileNotFoundException e) {
-        // Won't happen; we created the file just now.
-        throw new RuntimeException(e);
-      } finally {
-        mStopLatch.get().countDown();
-      }
-    }
-
-    public void stopRecording(CountDownLatch latch) {
-      mStopLatch.set(latch);
-    }
   }
 
   /**
