@@ -63,7 +63,7 @@ public class RecordingsListActivity extends ListActivity {
   protected void onListItemClick(ListView l, View v, int position, long id) {
     File file = (File) getListView().getItemAtPosition(position);
     Intent intent = new Intent(this, ReviewActivity.class);
-    intent.putExtra(ReviewActivity.FILENAME_EXTRA, file.getAbsolutePath());
+    intent.putExtra(ReviewActivity.FILENAMES_EXTRA, file.getAbsolutePath());
     startActivity(intent);
   }
 }

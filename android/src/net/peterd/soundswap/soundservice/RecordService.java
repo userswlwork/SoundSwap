@@ -3,7 +3,7 @@ package net.peterd.soundswap.soundservice;
 import static net.peterd.soundswap.Constants.TAG;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -37,10 +37,8 @@ public class RecordService extends Service implements LocationListener {
   LocationManager mLocationManager;
 
   private Location mLatestLocation;
-
   private Recorder mRecorder;
-  private File mAudioFile;
-  private long mAudioFileStartTimeMs;
+  private List<File> mRecordedFiles;
 
   private final Executor mExecutor = Executors.newSingleThreadExecutor();
 
@@ -112,18 +110,9 @@ public class RecordService extends Service implements LocationListener {
     }
 
     Log.i(Constants.TAG, "Starting recording.");
-    try {
-      mAudioFile = File.createTempFile("audio", "."
-          + Constants.RECORDING_FILE_EXTENSION,
-          Util.getFilesDir(getAccount(), Util.TEMP_DIR));
-    } catch (IOException e) {
-      Log.e(TAG, "Failed to create temporary file.", e);
-      return false;
-    }
-
-    mRecorder = new Recorder(mAudioFile);
+    mRecorder = new Recorder(Util.getFilesDir(getAccount(), Util.TEMP_DIR));
+    mRecordedFiles = null;
     mExecutor.execute(mRecorder);
-    mAudioFileStartTimeMs = System.currentTimeMillis();
 
     Notification notification = new Notification(R.drawable.icon,
         getText(R.string.recording),
@@ -164,7 +153,6 @@ public class RecordService extends Service implements LocationListener {
     } catch (InterruptedException e) {
       // Eh.
     }
-    mRecorder = null;
     Log.i(Constants.TAG, "Stopped recording.");
 
     if (mLatestLocation == null) {
@@ -173,10 +161,13 @@ public class RecordService extends Service implements LocationListener {
       Log.e(Constants.TAG, "Didn't have a location by the time we stopped " +
           "recording; dropping file.");
     } else {
-      Log.i(Constants.TAG, "Renaming temporary file.");
-      renameTempFile();
-      Log.i(Constants.TAG, "Renamed temporary file.");
+      Log.i(Constants.TAG, "Renaming temporary files.");
+      mRecordedFiles = mRecorder.renameTempFiles(this,
+          getAccount(),
+          mLatestLocation);
+      Log.i(Constants.TAG, "Renamed temporary files.");
     }
+    mRecorder = null;
     mLocationManager.removeUpdates(this);
 
     stopForeground(true);
@@ -192,41 +183,15 @@ public class RecordService extends Service implements LocationListener {
   }
 
   public synchronized long getRecordingLengthMs() {
-    return System.currentTimeMillis() - mAudioFileStartTimeMs;
+    return 0;
   }
 
   public synchronized long getRecordingSizeBytes() {
     return 0;
   }
 
-  public synchronized File getRecordedFile() {
-    return mAudioFile;
-  }
-
-  /**
-   * Rename the temporary audio file and switch to the "review and send"
-   * Activity.
-   */
-  private void renameTempFile() {
-    if (mLatestLocation == null) {
-      throw new IllegalStateException("Trying to rename temp file without a "
-          + "location.");
-    }
-
-    String finalFilename = Util.getRecordedFile(this,
-        getAccount(),
-        mAudioFileStartTimeMs,
-        (int) (mLatestLocation.getLatitude() * 1E6),
-        (int) (mLatestLocation.getLongitude() * 1E6));
-    Log.i(TAG, "Renaming '" + mAudioFile.getAbsolutePath() + "' to '"
-        + finalFilename + "'.");
-    File renamedFile = new File(finalFilename);
-    boolean renamed = mAudioFile.renameTo(renamedFile);
-    if (!renamed) {
-      throw new IllegalStateException("Could not rename file from '"
-          + mAudioFile.getAbsolutePath() + "' to '" + finalFilename + "'.");
-    }
-    mAudioFile = renamedFile;
+  public synchronized List<File> getRecordedFiles() {
+    return mRecordedFiles;
   }
 
   @Override

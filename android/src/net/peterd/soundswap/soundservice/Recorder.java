@@ -6,15 +6,21 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import net.peterd.soundswap.Constants;
+import net.peterd.soundswap.Util;
+import android.accounts.Account;
+import android.content.Context;
+import android.location.Location;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -26,78 +32,91 @@ class Recorder implements Runnable {
   private static final int BYTES_PER_SHORT = Short.SIZE / 8;
   private final AtomicReference<CountDownLatch> mStopLatch =
       new AtomicReference<CountDownLatch>();
-  private final File mOutputFile;
 
-  public Recorder(File outputFile) {
-    mOutputFile = outputFile;
+  private long mStartTimeMs;
+  private final File mOutputDir;
+  private final List<File> mFileParts =
+      Collections.synchronizedList(new ArrayList<File>());
+
+  public Recorder(File outputDir) {
+    mOutputDir = outputDir;
   }
+
+  private synchronized RandomAccessFile newInitializedFilePart() {
+    int newPartIndex = mFileParts.size();
+    File newPart = new File(mOutputDir,
+        String.format("%d_%d", mStartTimeMs, newPartIndex));
+    try {
+      final RandomAccessFile filePart = new RandomAccessFile(newPart, "rw");
+      initializeFilePart(filePart);
+      mFileParts.add(newPart);
+      return filePart;
+    } catch (FileNotFoundException e) {
+      // Won't happen; we created the file just now.
+      throw new RuntimeException(e);
+    } catch (IOException e) {
+      throw new RuntimeException("Could not initialize file.", e);
+    }
+  }
+
+  private final int MAX_BYTES_PER_FILEPART = 1024 * 1024;  // 1 megabyte
 
   @Override
   public void run() {
     Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO);
+
+    // Note that the successful execution of the logic below (explained in
+    // relevant comments) relies on this executor executing tasks in the order
+    // that they are scheduled for execution, and not executing any two tasks
+    // concurrently.
     ExecutorService writeExecutor = Executors.newSingleThreadExecutor();
 
+    mStartTimeMs = System.currentTimeMillis();
+
+    int bufferSize = AudioRecord.getMinBufferSize(
+        Constants.RECORDING_SAMPLE_RATE,
+        Constants.RECORDING_CHANNEL,
+        Constants.RECORDING_ENCODING);
+
+    AudioRecord audioRecord = new AudioRecord(
+        MediaRecorder.AudioSource.MIC,
+        Constants.RECORDING_SAMPLE_RATE,
+        Constants.RECORDING_CHANNEL,
+        Constants.RECORDING_ENCODING,
+        bufferSize);
+
+    final AtomicReference<RandomAccessFile> output =
+        new AtomicReference<RandomAccessFile>();
+
     try {
-      final RandomAccessFile output = new RandomAccessFile(mOutputFile, "rw");
-
-      short bSamples = Constants.RECORDING_ENCODING ==
-          AudioFormat.ENCODING_PCM_16BIT ? 16 : 8;
-
-      // Write file header.
-      try {
-        output.setLength(0); // Set file length to 0, to prevent unexpected
-                             // behavior in case the file already existed
-        output.writeBytes("RIFF");
-        output.writeInt(0); // Final file size not known yet, write 0
-        output.writeBytes("WAVE");
-        output.writeBytes("fmt ");
-        output.writeInt(Integer.reverseBytes(16)); // Sub-chunk size, 16 for
-                                                   // PCM
-        output.writeShort(Short.reverseBytes((short) 1)); // AudioFormat, 1
-                                                          // for PCM
-        output.writeShort(Short.reverseBytes((short) 1)); // Number of
-                                                          // channels, 1 for
-                                                          // mono
-        // Sample rate
-        output.writeInt(Integer.reverseBytes(Constants.RECORDING_SAMPLE_RATE));
-        output.writeInt(Integer.reverseBytes(Constants.RECORDING_SAMPLE_RATE
-            * bSamples / 8)); // Byte rate,
-                              // SampleRate*NumberOfChannels*BitsPerSample/8
-        output.writeShort(Short.reverseBytes((short) (bSamples / 8))); // Block
-                                                                       // align,
-                                                                       // NumberOfChannels*BitsPerSample/8
-        output.writeShort(Short.reverseBytes(bSamples)); // Bits per sample
-        output.writeBytes("data");
-        output.writeInt(0); // Data chunk size not known yet, write 0
-      } catch (IOException e) {
-        Log.e(TAG, "Failed to write wav file header.", e);
-        return;
-      }
-
-      int bufferSize = AudioRecord.getMinBufferSize(
-          Constants.RECORDING_SAMPLE_RATE,
-          Constants.RECORDING_CHANNEL,
-          Constants.RECORDING_ENCODING);
-
-      AudioRecord audioRecord = new AudioRecord(
-          MediaRecorder.AudioSource.MIC,
-          Constants.RECORDING_SAMPLE_RATE,
-          Constants.RECORDING_CHANNEL,
-          Constants.RECORDING_ENCODING,
-          bufferSize);
+      writeExecutor.submit(new InitializeNewFilePartCallable(output));
 
       audioRecord.startRecording();
 
-      int bytesRead = 0;
-      final AtomicInteger bytesWritten = new AtomicInteger(0);
-      final AtomicInteger bytesToWrite = new AtomicInteger(0);
+      int filePartBytesAssigned = 0;
       while (mStopLatch.get() == null) {
+        // If we've sent enough data to the current file part that writing the
+        // current buffer might overflow our maximum per-part size limit, then
+        // schedule a task to close the current file part and initialize a new
+        // one.  The successful operation of this relies on the fact that we're
+        // using a single-threaded, sequential executor.
+        if (filePartBytesAssigned > MAX_BYTES_PER_FILEPART - bufferSize * 2) {
+          writeExecutor.submit(new FinalizeFilePartCallable(output,
+              filePartBytesAssigned));
+          writeExecutor.submit(new InitializeNewFilePartCallable(output));
+
+          // Now we'll be sending bytes to a new file part, so reset the counter
+          filePartBytesAssigned = 0;
+        }
+
         // Allocate a buffer
         final short[] buffer = new short[bufferSize];
 
+        //
         // Read from the audio stream into the buffer
+        //
         final int bufferReadResult = audioRecord.read(buffer, 0, bufferSize);
-        bytesRead += bufferReadResult * BYTES_PER_SHORT;
+        filePartBytesAssigned += bufferReadResult * BYTES_PER_SHORT;
 
         if (bufferReadResult == AudioRecord.ERROR_INVALID_OPERATION) {
           throw new IllegalStateException("Invalid audiorecord read "
@@ -107,53 +126,24 @@ class Recorder implements Runnable {
         }
 
         // Asynchronously write the buffer to disk
-        bytesToWrite.addAndGet(bufferReadResult * BYTES_PER_SHORT);
-        writeExecutor.submit(new Callable<Boolean>() {
-              @Override
-              public Boolean call() {
-                for (int i = 0; i < bufferReadResult; i++) {
-                  try {
-                    output.writeShort(Short.reverseBytes(buffer[i]));
-                    bytesWritten.addAndGet(BYTES_PER_SHORT);
-                    bytesToWrite.addAndGet(-1 * BYTES_PER_SHORT);
-                  } catch (IOException e) {
-                    Log.e(TAG, "Could not write to output stream.");
-                    return false;
-                  }
-                }
-                return true;
-              }
-            });
-
-        Log.d(TAG, "Recording... bytes read: " + bytesRead +
-            "; bytes written: " + bytesWritten.get() +
-            "; bytes in write buffer: " + bytesToWrite.get());
+        writeExecutor.submit(new WriteBufferDataCallable(output,
+            buffer,
+            bufferReadResult));
       }
 
       // We got notice that we should stop, so stop listening to the microphone,
-      // and wait for all buffered data to flush to disk
+      // schedule a closure of the current file part, and wait for all scheduled
+      // disk operations to complete.
       audioRecord.stop();
+      writeExecutor.submit(new FinalizeFilePartCallable(output,
+          filePartBytesAssigned));
       writeExecutor.shutdown();
+
       try {
         writeExecutor.awaitTermination(3600, TimeUnit.SECONDS);
       } catch (InterruptedException e) {
         Log.e(TAG, "Interrupted while flushing audio to disk.", e);
       }
-
-      // Update wav file header and close it.
-
-      try {
-        output.seek(4); // Write size to RIFF header
-        output.writeInt(Integer.reverseBytes(36 + bytesWritten.get()));
-        output.seek(40); // Write size to Subchunk2Size field
-        output.writeInt(Integer.reverseBytes(bytesWritten.get()));
-        output.close();
-      } catch (IOException e) {
-        Log.e(TAG, "Could not close output file.");
-      }
-    } catch (FileNotFoundException e) {
-      // Won't happen; we created the file just now.
-      throw new RuntimeException(e);
     } finally {
       CountDownLatch latch = mStopLatch.get();
       if (latch != null) {
@@ -162,7 +152,153 @@ class Recorder implements Runnable {
     }
   }
 
+  private class InitializeNewFilePartCallable implements Callable<Boolean> {
+
+    private final AtomicReference<RandomAccessFile> mOutput;
+
+    public InitializeNewFilePartCallable(
+        AtomicReference<RandomAccessFile> output) {
+      mOutput = output;
+    }
+
+    @Override
+    public Boolean call() {
+      Log.i(TAG, "Initializing new file part.");
+      RandomAccessFile newOutput = newInitializedFilePart();
+      Log.i(TAG, "Initialized new file part.");
+
+      mOutput.set(newOutput);
+      Log.i(TAG, "Set new file part.");
+      return true;
+    }
+  }
+
+  private class FinalizeFilePartCallable implements Callable<Boolean> {
+
+    private final AtomicReference<RandomAccessFile> mOutput;
+    private final int mBytesWritten;
+
+    public FinalizeFilePartCallable(
+        AtomicReference<RandomAccessFile> output,
+        int bytesWritten) {
+      mOutput = output;
+      mBytesWritten = bytesWritten;
+    }
+
+    @Override
+    public Boolean call() {
+      RandomAccessFile oldOutput = mOutput.get();
+      try {
+        Log.i(TAG, "Finalizing previous file part.");
+        finalizeFilePart(oldOutput, mBytesWritten);
+        Log.i(TAG, "Finalized previous file part.");
+      } catch (IOException e) {
+        Log.e(TAG, "Failed to finalize file part.");
+      }
+      return true;
+    }
+  }
+
+  private static class WriteBufferDataCallable implements Callable<Boolean> {
+
+    private final AtomicReference<RandomAccessFile> mOutput;
+    private final short[] mBuffer;
+    private final int mSamplesToWrite;
+
+    public WriteBufferDataCallable(AtomicReference<RandomAccessFile> output,
+        short[] buffer,
+        int bytesToWrite) {
+      mOutput = output;
+      mBuffer = buffer;
+      mSamplesToWrite = bytesToWrite;
+    }
+
+    @Override
+    public Boolean call() {
+      RandomAccessFile output = mOutput.get();
+      for (int i = 0; i < mSamplesToWrite; i++) {
+        try {
+          output.writeShort(Short.reverseBytes(mBuffer[i]));
+        } catch (IOException e) {
+          Log.e(TAG, "Could not write to output stream.");
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+
+  private void initializeFilePart(final RandomAccessFile output)
+      throws IOException {
+    short bSamples = Constants.RECORDING_ENCODING ==
+        AudioFormat.ENCODING_PCM_16BIT ? 16 : 8;
+
+    // Write file header.
+    output.setLength(0); // Set file length to 0, to prevent unexpected
+                         // behavior in case the file already existed
+    output.writeBytes("RIFF");
+    output.writeInt(0); // Final file size not known yet, write 0
+    output.writeBytes("WAVE");
+    output.writeBytes("fmt ");
+    output.writeInt(Integer.reverseBytes(16)); // Sub-chunk size, 16 for
+                                               // PCM
+    output.writeShort(Short.reverseBytes((short) 1)); // AudioFormat, 1
+                                                      // for PCM
+    output.writeShort(Short.reverseBytes((short) 1)); // Number of
+                                                      // channels, 1 for
+                                                      // mono
+    // Sample rate
+    output.writeInt(Integer.reverseBytes(Constants.RECORDING_SAMPLE_RATE));
+    output.writeInt(Integer.reverseBytes(Constants.RECORDING_SAMPLE_RATE
+        * bSamples / 8)); // Byte rate,
+                          // SampleRate*NumberOfChannels*BitsPerSample/8
+    output.writeShort(Short.reverseBytes((short) (bSamples / 8))); // Block
+                                                                   // align,
+                                                                   // NumberOfChannels*BitsPerSample/8
+    output.writeShort(Short.reverseBytes(bSamples)); // Bits per sample
+    output.writeBytes("data");
+    output.writeInt(0); // Data chunk size not known yet, write 0
+  }
+
+  private void finalizeFilePart(final RandomAccessFile output,
+      int bytesWritten) throws IOException {
+    output.seek(4); // Write size to RIFF header
+    output.writeInt(Integer.reverseBytes(36 + bytesWritten));
+    output.seek(40); // Write size to Subchunk2Size field
+    output.writeInt(Integer.reverseBytes(bytesWritten));
+    output.close();
+  }
+
   public void stopRecording(CountDownLatch latch) {
     mStopLatch.set(latch);
+  }
+
+  public List<File> renameTempFiles(Context context, Account account, Location location) {
+    if (location == null) {
+      throw new IllegalStateException("Trying to rename temp file without a "
+          + "location.");
+    }
+
+    List<File> renamedFiles = new ArrayList<File>();
+    for (int partIndex = 0; partIndex < mFileParts.size(); ++partIndex) {
+      File tempFile = mFileParts.get(partIndex);
+      String finalFilename = Util.getRecordedFile(context,
+          account,
+          mStartTimeMs,
+          (int) (location.getLatitude() * 1E6),
+          (int) (location.getLongitude() * 1E6),
+          partIndex);
+      Log.i(TAG, "Renaming '" + tempFile.getAbsolutePath() + "' to '"
+          + finalFilename + "'.");
+      File renamedFile = new File(finalFilename);
+      boolean renamed = tempFile.renameTo(renamedFile);
+      if (renamed) {
+        renamedFiles.add(renamedFile);
+      } else {
+        throw new IllegalStateException("Could not rename file from '"
+            + tempFile.getAbsolutePath() + "' to '" + finalFilename + "'.");
+      }
+    }
+    return renamedFiles;
   }
 }

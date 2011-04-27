@@ -1,16 +1,10 @@
 package net.peterd.soundswap;
 
 import java.io.File;
-import java.io.IOException;
 
 import android.accounts.Account;
-import android.app.AlertDialog;
-import android.app.ProgressDialog;
 import android.content.Context;
-import android.content.DialogInterface;
-import android.media.MediaPlayer;
 import android.os.Environment;
-import android.util.Log;
 
 public class Util {
 
@@ -38,12 +32,14 @@ public class Util {
       Account account,
       long timeMillis,
       int latitudeE6,
-      int longitudeE6) {
+      int longitudeE6,
+      int filePart) {
     File cacheDir = getFilesDir(account, RECORDED_DIR);
     String filename = getFilename(context,
         System.currentTimeMillis(),
         latitudeE6,
-        longitudeE6);
+        longitudeE6,
+        filePart);
     String fullFilename = cacheDir.getAbsolutePath() + "/" + filename;
     return fullFilename;
   }
@@ -56,11 +52,13 @@ public class Util {
   private static String getFilename(Context context,
       long timeMillis,
       int latitudeE6,
-      int longitudeE6) {
+      int longitudeE6,
+      int filePart) {
     return new StringBuilder()
         .append(timeMillis).append("_")
         .append(latitudeE6).append("_")
-        .append(longitudeE6)
+        .append(longitudeE6).append("_")
+        .append(filePart)
         .append(".").append(Constants.RECORDING_FILE_EXTENSION)
         .toString();
   }
@@ -76,69 +74,5 @@ public class Util {
         .append("/")
         .append(filename)
         .toString());
-  }
-
-  public static boolean play(final Context context, File file) {
-    String fileName = file.getAbsolutePath();
-
-    final MediaPlayer player = new MediaPlayer();
-
-    final ProgressDialog playingDialog = new ProgressDialog(context);
-    playingDialog.setCancelable(true);
-    playingDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
-          @Override
-          public void onCancel(DialogInterface dialog) {
-            player.stop();
-          }
-        });
-
-    MediaPlayer.OnCompletionListener finishedPlayingListener =
-        new MediaPlayer.OnCompletionListener() {
-              @Override
-              public void onCompletion(MediaPlayer mp) {
-                playingDialog.dismiss();
-                mp.reset();
-                mp.release();
-              }
-            };
-    player.setOnCompletionListener(finishedPlayingListener);
-
-    player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-          @Override
-          public boolean onError(MediaPlayer mp, int what, int extra) {
-            new AlertDialog.Builder(context)
-                .setCancelable(true)
-                .setMessage(R.string.error_playing)
-                .show();
-            return false;
-          }
-        });
-
-    try {
-      player.setDataSource(fileName);
-    } catch (IllegalArgumentException e) {
-      throw new RuntimeException(e);
-    } catch (IllegalStateException e) {
-      throw new RuntimeException(e);
-    } catch (IOException e) {
-      Log.e("MOO", "Failed to set datasource to file at location '" + fileName +
-          "'.");
-      return false;
-    }
-
-    try {
-      player.prepare();
-    } catch (IllegalStateException e) {
-      throw new RuntimeException(e);
-    } catch (IOException e) {
-      Log.e("MOO", "Failed to prepare to play file at location '" + fileName +
-          "'.");
-      return false;
-    }
-
-    player.start();
-    playingDialog.show();
-
-    return true;
   }
 }

@@ -1,6 +1,8 @@
 package net.peterd.soundswap.ui;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.R;
@@ -135,9 +137,15 @@ public class RecordActivity extends AuthenticatedActivity {
     Runnable callback = new Runnable() {
       @Override
       public void run() {
-        File file = mBinder.getService().getRecordedFile();
+        List<File> files = mBinder.getService().getRecordedFiles();
+        ArrayList<String> fileNames = new ArrayList<String>();
+        for (File file : files) {
+          fileNames.add(file.getAbsolutePath());
+        }
+
         Intent intent = new Intent(RecordActivity.this, ReviewActivity.class);
-        intent.putExtra(ReviewActivity.FILENAME_EXTRA, file.getAbsolutePath());
+        intent.putStringArrayListExtra(ReviewActivity.FILENAMES_EXTRA,
+            fileNames);
         startActivity(intent);
       }
     };

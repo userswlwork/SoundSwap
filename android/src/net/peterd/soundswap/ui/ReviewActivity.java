@@ -1,11 +1,20 @@
 package net.peterd.soundswap.ui;
 
+import static net.peterd.soundswap.Constants.TAG;
+
 import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 import net.peterd.soundswap.R;
-import net.peterd.soundswap.Util;
 import net.peterd.soundswap.syncadapter.SyncService;
+import android.app.AlertDialog;
+import android.app.ProgressDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -13,9 +22,9 @@ import android.widget.Button;
 
 public class ReviewActivity extends AuthenticatedActivity {
 
-  public static final String FILENAME_EXTRA = "filename";
+  public static final String FILENAMES_EXTRA = "filenames";
 
-  private File mRecordedFile;
+  private final ArrayList<File> mFiles = new ArrayList<File>();
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
@@ -26,7 +35,7 @@ public class ReviewActivity extends AuthenticatedActivity {
     playButton.setOnClickListener(new View.OnClickListener() {
       @Override
       public void onClick(View v) {
-        Util.play(ReviewActivity.this, mRecordedFile);
+        playFileList();
       }
     });
 
@@ -52,26 +61,31 @@ public class ReviewActivity extends AuthenticatedActivity {
     super.onResume();
 
     Intent intent = getIntent();
-    String filename = intent.getStringExtra(FILENAME_EXTRA);
+    List<String> filenames = intent.getStringArrayListExtra(FILENAMES_EXTRA);
 
-    if (filename == null) {
+    if (filenames == null || filenames.size() == 0) {
       throw new IllegalArgumentException("Launch intent must include a "
-          + "filename to review.");
+          + "list of filenames to review.");
     }
 
-    mRecordedFile = new File(filename);
-    if (!mRecordedFile.exists()) {
-      throw new IllegalArgumentException("File '" + filename + "' does not "
-          + "exist.");
-    } else {
-      long fileLength = mRecordedFile.length();
-      Log.i("MOO", "Recorded file '" + filename + "' exists and has length "
-          + fileLength);
+    for (String filename : filenames) {
+      File file = new File(filename);
+      if (!file.exists()) {
+        throw new IllegalArgumentException("File '" + filename + "' does not "
+            + "exist.");
+      } else {
+        long fileLength = file.length();
+        Log.i(TAG, "Recorded file '" + filename + "' exists and has length "
+            + fileLength);
+        mFiles.add(file);
+      }
     }
   }
 
   private void deleteAndRecord() {
-    mRecordedFile.delete();
+    for (File file : mFiles) {
+      file.delete();
+    }
     startActivity(new Intent(this, RecordActivity.class));
     finish();
   }
@@ -82,5 +96,85 @@ public class ReviewActivity extends AuthenticatedActivity {
 
     // Go to the list of sounds
     startActivity(new Intent(this, RecordingsListActivity.class));
+  }
+
+  private boolean playFileList() {
+    final Iterator<File> fileIterable = mFiles.iterator();
+
+    final MediaPlayer player = new MediaPlayer();
+
+    final ProgressDialog playingDialog = new ProgressDialog(this);
+    playingDialog.setCancelable(true);
+    playingDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+          @Override
+          public void onCancel(DialogInterface dialog) {
+            player.stop();
+          }
+        });
+
+    MediaPlayer.OnCompletionListener finishedPlayingListener =
+        new MediaPlayer.OnCompletionListener() {
+              @Override
+              public void onCompletion(MediaPlayer mp) {
+                if (fileIterable.hasNext()) {
+                  File file = fileIterable.next();
+                  player.reset();
+                  startPlayingFile(file, player);
+                } else {
+                  playingDialog.dismiss();
+                  mp.reset();
+                  mp.release();
+                }
+              }
+            };
+    player.setOnCompletionListener(finishedPlayingListener);
+
+    player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+          @Override
+          public boolean onError(MediaPlayer mp, int what, int extra) {
+            new AlertDialog.Builder(ReviewActivity.this)
+                .setCancelable(true)
+                .setMessage(R.string.error_playing)
+                .show();
+            return false;
+          }
+        });
+
+
+    File file = fileIterable.next();
+
+    if (startPlayingFile(file, player)) {
+      playingDialog.show();
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  private boolean startPlayingFile(File file, MediaPlayer player) {
+    try {
+      player.setDataSource(file.getAbsolutePath());
+    } catch (IllegalArgumentException e) {
+      throw new RuntimeException(e);
+    } catch (IllegalStateException e) {
+      throw new RuntimeException(e);
+    } catch (IOException e) {
+      Log.e(TAG, "Failed to set datasource to file at location '" +
+          file.getAbsolutePath() + "'.");
+      return false;
+    }
+
+    try {
+      player.prepare();
+    } catch (IllegalStateException e) {
+      throw new RuntimeException(e);
+    } catch (IOException e) {
+      Log.e(TAG, "Failed to prepare to play file at location '" +
+          file.getAbsolutePath() + "'.");
+      return false;
+    }
+
+    player.start();
+    return true;
   }
 }
