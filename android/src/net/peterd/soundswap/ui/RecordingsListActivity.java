@@ -1,10 +1,10 @@
 package net.peterd.soundswap.ui;
 
-import java.io.File;
+import java.util.Collection;
 
 import net.peterd.soundswap.Preferences;
 import net.peterd.soundswap.R;
-import net.peterd.soundswap.Util;
+import net.peterd.soundswap.Recording;
 import net.peterd.soundswap.syncadapter.SyncService;
 import android.accounts.Account;
 import android.app.ListActivity;
@@ -27,11 +27,14 @@ public class RecordingsListActivity extends ListActivity {
     if (account == null) {
       throw new IllegalStateException("no account.");
     }
-    File[] files = Util.getRecordedFiles(account, this);
-    setListAdapter(new ArrayAdapter<File>(this,
+    Collection<Recording> recordings = Recording.getRecordings(this, account);
+    Recording[] recordingsArr =
+        recordings.toArray(new Recording[recordings.size()]);
+
+    setListAdapter(new ArrayAdapter<Recording>(this,
         android.R.layout.activity_list_item,
         android.R.id.text1,
-        files));
+        recordingsArr));
   }
 
   @Override
@@ -61,9 +64,9 @@ public class RecordingsListActivity extends ListActivity {
 
   @Override
   protected void onListItemClick(ListView l, View v, int position, long id) {
-    File file = (File) getListView().getItemAtPosition(position);
+    Recording recording = (Recording) getListView().getItemAtPosition(position);
     Intent intent = new Intent(this, ReviewActivity.class);
-    intent.putExtra(ReviewActivity.FILENAMES_EXTRA, file.getAbsolutePath());
+    intent.putExtra(ReviewActivity.RECORDING_KEY_EXTRA, recording.getKey());
     startActivity(intent);
   }
 }

@@ -18,21 +18,6 @@ from google.appengine.ext import webapp
 from google.appengine.ext.webapp import blobstore_handlers
 
 
-class GetBlobUploadHandler(webapp.RequestHandler):
-  def get(self):
-    upload_url = blobstore.create_upload_url(common._UPLOAD_SOUND_BASE_PATH)
-    self.redirect(upload_url)
-
-
-class GetMyRecordingsHandler(webapp.RequestHandler):
-  def get(self):
-    user = users.get_current_user()
-    query = recording.Recording.all()
-    query.filter("user = ", user)
-    self.response.out.write("\n".join(map(lambda rec: rec.blob.filename, 
-                                          query)))
-    
-
 class GetRecordingHandler(blobstore_handlers.BlobstoreDownloadHandler):
   def get(self):
     user = users.get_current_user()
@@ -78,47 +63,84 @@ class GetRecordingBlobHandler(blobstore_handlers.BlobstoreDownloadHandler):
     self.send_blob(blob_info, content_type=content_type)
     
 
-class SoundUploadHandler(blobstore_handlers.BlobstoreUploadHandler):
-  def post(self):
-    uploads = self.get_uploads()
-    assert uploads is not None
-    assert len(uploads) == 1
-    assert uploads[0] is not None
+class FilePartRedirectHandler(blobstore_handlers.BlobstoreUploadHandler):
+  def post(self, client_key):
+    user = users.get_current_user()
+    recording = recording.Recording.all() \
+        .filter("client_key = ", client_key) \
+        .get()
+    if recording is None or recording.user != user:
+      self.error(401)
+      return
     
-    upload = uploads[0]
-    assert upload is not None
-    
-    upload_key = upload.key()
-    assert upload_key is not None
+    upload_url = blobstore.create_upload_url(
+        "/api/sound/upload_finished?client_key=%s" % client_key)
+    self.redirect(upload_url)
 
-    time_ms = None
-    latE6 = None
-    lonE6 = None
+
+class FilePartFinishedHandler(blobstore_handlers.BlobstoreUploadHandler):
+  def post(self, client_key):
+    uploads = self.get_uploads()
+    if uploads is None:
+      logging.error("No uploads.")
+      self.error(500)
+      return
     
-    if self.request.get("from_web") == "True":
-      time_ms = int(self.request.get("time_ms"))
-      latE6 = int(self.request.get("latE6"))
-      lonE6 = int(self.request.get("lonE6"))
-    else:
-      # Sample filename: 1300058598218_37765137_-122450695.wav.zip
-      filename = upload.filename
-      parts = filename.split(".")[0].split("_")
-      time_ms = int(parts[0])
-      latE6 = int(parts[1])
-      lonE6 = int(parts[2])
+    if len(uploads) != 1:
+      logging.error("Wrong number of uploads, deleting all of them.")
+      for upload in uploads:
+        upload.delete()
+      self.error(500)
+      return
+
+    if uploads[0] is None:
+      logging.error("Upload was None")
+      self.error(500)
+      return
+    upload = uploads[0]
     
-    assert time_ms is not None
-    assert lonE6 is not None
-    assert latE6 is not None
+    user = users.get_current_user()
+    recording = recording.Recording.all() \
+        .filter("client_key = ", client_key) \
+        .get()
+    if recording is None or recording.user != user:
+      logging.error("Failed to match recording with id %d, or the recording "
+                    "did not belong to user %s" % (recording_id, user))
+      upload.delete()
+      self.error(401)
+      return
+    
+    recording.file_parts.append(upload.key())
+    
+    # TODO(peterdolan): Figure out a better redirect location
+    self.redirect("/")
+
+
+class CreateRecordingHandler(webapp.RequestHandler):
+  def post(self, client_key, timestamp_ms, latE6, lonE6):
+    timestamp_ms = long(timestamp_ms)
+    latE6 = int(latE6)
+    lonE6 = int(lonE6)
     
     location = db.GeoPt(latE6 / 1E6, lonE6 / 1E6)
-    created_time = datetime.datetime.fromtimestamp((int) (time_ms/1000))
+    created_time = datetime.datetime.fromtimestamp((int) (timestamp_ms/1000))
     
-    record = recording.Recording(location = location,
+    record = recording.Recording(client_key = client_key,
+                                 location = location,
                                  created_time = created_time,
-                                 blob = upload_key,
                                  random_number = common.GetRandomNumber())
     record.put()
     
     # TODO(peterdolan): Redirect to an appropriate location, for web form users
     self.redirect("/")
+    
+
+class GetMyRecordingsHandler(webapp.RequestHandler):
+  def get(self):
+    user = users.get_current_user()
+    query = recording.Recording.all()
+    query.filter("user = ", user)
+    self.response.out.write("\n".join(map(lambda rec: rec.client_key,
+                                          query)))
+
+

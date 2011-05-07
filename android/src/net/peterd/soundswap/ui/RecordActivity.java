@@ -1,11 +1,8 @@
 package net.peterd.soundswap.ui;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
 import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.R;
+import net.peterd.soundswap.Recording;
 import net.peterd.soundswap.soundservice.RecordService;
 import android.app.AlertDialog;
 import android.content.ComponentName;
@@ -137,15 +134,9 @@ public class RecordActivity extends AuthenticatedActivity {
     Runnable callback = new Runnable() {
       @Override
       public void run() {
-        List<File> files = mBinder.getService().getRecordedFiles();
-        ArrayList<String> fileNames = new ArrayList<String>();
-        for (File file : files) {
-          fileNames.add(file.getAbsolutePath());
-        }
-
+        Recording recording = mBinder.getService().getRecording();
         Intent intent = new Intent(RecordActivity.this, ReviewActivity.class);
-        intent.putStringArrayListExtra(ReviewActivity.FILENAMES_EXTRA,
-            fileNames);
+        intent.putExtra(ReviewActivity.RECORDING_KEY_EXTRA, recording.getKey());
         startActivity(intent);
       }
     };

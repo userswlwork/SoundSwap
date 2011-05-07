@@ -4,11 +4,11 @@ import static net.peterd.soundswap.Constants.TAG;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
 
 import net.peterd.soundswap.R;
+import net.peterd.soundswap.Recording;
 import net.peterd.soundswap.syncadapter.SyncService;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
@@ -22,9 +22,9 @@ import android.widget.Button;
 
 public class ReviewActivity extends AuthenticatedActivity {
 
-  public static final String FILENAMES_EXTRA = "filenames";
+  public static final String RECORDING_KEY_EXTRA = "recording_key";
 
-  private final ArrayList<File> mFiles = new ArrayList<File>();
+  private Recording mRecording;
 
   @Override
   public void onCreate(Bundle savedInstanceState) {
@@ -61,31 +61,24 @@ public class ReviewActivity extends AuthenticatedActivity {
     super.onResume();
 
     Intent intent = getIntent();
-    List<String> filenames = intent.getStringArrayListExtra(FILENAMES_EXTRA);
+    String recordingKey = intent.getStringExtra(RECORDING_KEY_EXTRA);
 
-    if (filenames == null || filenames.size() == 0) {
+    if (recordingKey == null) {
       throw new IllegalArgumentException("Launch intent must include a "
-          + "list of filenames to review.");
+          + "recording key to review.");
     }
 
-    for (String filename : filenames) {
-      File file = new File(filename);
-      if (!file.exists()) {
-        throw new IllegalArgumentException("File '" + filename + "' does not "
-            + "exist.");
-      } else {
-        long fileLength = file.length();
-        Log.i(TAG, "Recorded file '" + filename + "' exists and has length "
-            + fileLength);
-        mFiles.add(file);
-      }
+    mRecording = Recording.getRecording(this,
+        getAccount(),
+        recordingKey);
+    if (mRecording == null) {
+      throw new IllegalArgumentException("Recording key '" + recordingKey +
+          "' did not match a recording.");
     }
   }
 
   private void deleteAndRecord() {
-    for (File file : mFiles) {
-      file.delete();
-    }
+    mRecording.delete();
     startActivity(new Intent(this, RecordActivity.class));
     finish();
   }
@@ -99,7 +92,8 @@ public class ReviewActivity extends AuthenticatedActivity {
   }
 
   private boolean playFileList() {
-    final Iterator<File> fileIterable = mFiles.iterator();
+    final Iterator<File> fileIterable =
+        Arrays.asList(mRecording.getFileParts()).iterator();
 
     final MediaPlayer player = new MediaPlayer();
 

@@ -41,6 +41,8 @@ public class AuthenticatedHttpClient {
    */
   private static final String APPENGINE_AUTH_COOKIE_NAME = "ACSID";
 
+  private static final boolean DISABLE_AUTH_FOR_TESTING = false;
+
   private final Context mContext;
   private final Preferences mPreferences;
   private final DefaultHttpClient mClient;
@@ -60,9 +62,10 @@ public class AuthenticatedHttpClient {
         ClientPNames.HANDLE_REDIRECTS, false);
   }
 
-  public <T> T request(HttpUriRequest request, ResponseHandler<T> responseProcessor) {
+  public <T> T request(HttpUriRequest request,
+      ResponseHandler<T> responseProcessor) {
     Log.i(Constants.TAG, "Request (" + request.getURI() + ")");
-    if (!isAuthenticated()) {
+    if (!isAuthenticated() && !DISABLE_AUTH_FOR_TESTING) {
       authenticate();
     }
     return doRequest(responseProcessor, request);
@@ -163,7 +166,7 @@ public class AuthenticatedHttpClient {
                   @Override
                   public Boolean handleResponse(HttpResponse response)
                       throws ClientProtocolException, IOException {
-                    Log.d(Constants.TAG, "Response: " + response.getStatusLine().getStatusCode() + "; " + Arrays.toString(response.getAllHeaders()));
+                    Log.d(Constants.TAG, "Response: " + response.getStatusLine().getStatusCode() + "; " + Arrays.toString(response.getAllHeaders()) + "; " + response.getStatusLine().getReasonPhrase());
                     return isAuthenticated();
                   }
                 });

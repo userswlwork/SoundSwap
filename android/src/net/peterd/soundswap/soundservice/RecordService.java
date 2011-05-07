@@ -2,8 +2,6 @@ package net.peterd.soundswap.soundservice;
 
 import static net.peterd.soundswap.Constants.TAG;
 
-import java.io.File;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -11,7 +9,7 @@ import java.util.concurrent.Executors;
 import net.peterd.soundswap.Constants;
 import net.peterd.soundswap.Preferences;
 import net.peterd.soundswap.R;
-import net.peterd.soundswap.Util;
+import net.peterd.soundswap.Recording;
 import net.peterd.soundswap.ui.RecordActivity;
 import android.accounts.Account;
 import android.app.Notification;
@@ -38,7 +36,7 @@ public class RecordService extends Service implements LocationListener {
 
   private Location mLatestLocation;
   private Recorder mRecorder;
-  private List<File> mRecordedFiles;
+  private Recording mRecording;
 
   private final Executor mExecutor = Executors.newSingleThreadExecutor();
 
@@ -110,8 +108,7 @@ public class RecordService extends Service implements LocationListener {
     }
 
     Log.i(Constants.TAG, "Starting recording.");
-    mRecorder = new Recorder(Util.getFilesDir(getAccount(), Util.TEMP_DIR));
-    mRecordedFiles = null;
+    mRecorder = new Recorder(getBaseContext(), getAccount());
     mExecutor.execute(mRecorder);
 
     Notification notification = new Notification(R.drawable.icon,
@@ -162,11 +159,14 @@ public class RecordService extends Service implements LocationListener {
           "recording; dropping file.");
     } else {
       Log.i(Constants.TAG, "Renaming temporary files.");
-      mRecordedFiles = mRecorder.renameTempFiles(this,
-          getAccount(),
-          mLatestLocation);
-      Log.i(Constants.TAG, "Renamed temporary files.");
+      if (mRecorder.finalize(mLatestLocation)) {
+        Log.i(Constants.TAG, "Renamed temporary files.");
+      } else {
+        // TODO(peterdolan): handle this failure
+        Log.e(Constants.TAG, "Failed to rename temporary files.");
+      }
     }
+    mRecording = mRecorder.getFinalRecording();
     mRecorder = null;
     mLocationManager.removeUpdates(this);
 
@@ -190,8 +190,8 @@ public class RecordService extends Service implements LocationListener {
     return 0;
   }
 
-  public synchronized List<File> getRecordedFiles() {
-    return mRecordedFiles;
+  public synchronized Recording getRecording() {
+    return mRecording;
   }
 
   @Override

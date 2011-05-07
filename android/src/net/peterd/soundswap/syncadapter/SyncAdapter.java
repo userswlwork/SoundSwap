@@ -5,12 +5,11 @@ import static net.peterd.soundswap.Constants.TAG;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 import net.peterd.soundswap.Constants;
-import net.peterd.soundswap.Util;
+import net.peterd.soundswap.Recording;
 import net.peterd.soundswap.client.AuthenticatedHttpClient;
 
 import org.apache.http.Header;
@@ -29,6 +28,7 @@ import android.content.AbstractThreadedSyncAdapter;
 import android.content.ContentProviderClient;
 import android.content.Context;
 import android.content.SyncResult;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -57,17 +57,23 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
       SyncResult syncResult) {
     Log.i(TAG, "Synchronizing account '" + account + "'.");
 
-    File[] files = Util.getRecordedFiles(account, mContext);
-    String[] filenames = new String[files.length];
-    for (int i = 0; i < files.length; ++i) {
-      filenames[i] = files[i].getName();
+    Set<String> existingRecordingKeys = getExistingRecordingKeys();
+    if (existingRecordingKeys == null) {
+      return;
     }
 
-    Set<String> filenamesToUpload = new HashSet<String>();
-    Collections.addAll(filenamesToUpload, filenames);
+    for (Recording recording : Recording.getRecordings(mContext, account)) {
+      if (!existingRecordingKeys.contains(recording.getKey())) {
+        uploadRecording(recording);
+      }
+    }
+  }
+
+  private Set<String> getExistingRecordingKeys() {
+    Log.i(TAG, "Getting list of registered recording keys.");
 
     HttpGet get = new HttpGet(Constants.LIST_SOUNDS_URL);
-    Set<String> uploadedFileNames = mFileListClient.request(get,
+    Set<String> existingRecordingTimestamps = mFileListClient.request(get,
         new ResponseHandler<Set<String>>() {
             @Override
             public Set<String> handleResponse(HttpResponse response)
@@ -78,11 +84,13 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
                 String contents = EntityUtils.toString(entity);
                 String[] lines = contents.split("\n");
 
-                Log.d(TAG, "List of uploaded recordings: " +
+                Log.d(TAG, "List of uploaded recording timestamps: " +
                     Arrays.toString(lines));
 
                 Set<String> set = new HashSet<String>();
-                Collections.addAll(set, lines);
+                for (String line : lines) {
+                  set.add(line);
+                }
                 return set;
               } else {
                 Log.e(TAG, "List recordings failed.");
@@ -90,23 +98,25 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
               }
             }
           });
+    return existingRecordingTimestamps;
+  }
 
-    if (uploadedFileNames == null) {
+  private void uploadRecording(Recording recording) {
+    Log.i(TAG, "Uploading recording with key " + recording.getKey());
+
+    if (!mSender.createRecording(recording)) {
+      Log.e(TAG, "Failed to create record on server for Recording with " +
+          "key " + recording.getKey());
       return;
     }
 
-    filenamesToUpload.removeAll(uploadedFileNames);
-
-    for (String filename : filenamesToUpload) {
-      if (!uploadFileWithName(account, filename)) {
-        Log.e(TAG, "Failed to upload file with name '" + filename + "'.");
+    for (File file : recording.getFileParts()) {
+      if (!mSender.addFilePart(recording, file)) {
+        Log.e(TAG, "Failed to upload file " + file.getAbsolutePath() +
+            " as part of recording with key " + recording.getKey());
+          break;
+        }
       }
-    }
-  }
-
-  private boolean uploadFileWithName(Account account, String filename) {
-    File file = Util.getRecordedFile(account, filename);
-    return mSender.sendFile(file);
   }
 
   private static class Sender {
@@ -119,15 +129,34 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
       mClient = client;
     }
 
-    protected boolean sendFile(final File inputF) {
-      if (!inputF.exists()) {
-        throw new IllegalArgumentException("File " + inputF.getAbsolutePath()
+    public boolean createRecording(final Recording recording) {
+      HttpPost post = new HttpPost(
+          Constants.HOST +
+          "/api/sound/new?client_key=" +
+          Uri.encode(recording.getKey()));
+      return mClient.request(post, new ResponseHandler<Boolean>() {
+            @Override
+            public Boolean handleResponse(HttpResponse response) {
+              return response.getStatusLine().getStatusCode() == 200;
+            }
+          });
+    }
+
+    public boolean addFilePart(final Recording recording,
+        final File filePart) {
+      if (!filePart.exists()) {
+        throw new IllegalArgumentException("File " + filePart.getAbsolutePath()
             + " does not exist.");
       }
 
+      String url = Uri.parse(Constants.FORM_REDIRECT_URL).buildUpon()
+          .appendQueryParameter("client_key", recording.getKey())
+          .build()
+          .toString();
+
       // Get the upload redirect Uri.
       String uploadUri = mClient.request(
-          new HttpGet(Constants.FORM_REDIRECT_URL),
+          new HttpGet(url),
           new ResponseHandler<String>() {
             @Override
             public String handleResponse(HttpResponse response)
@@ -148,13 +177,13 @@ public class SyncAdapter extends AbstractThreadedSyncAdapter {
       }
 
       // Upload the file.
-      FileBody body = new FileBody(inputF);
+      FileBody body = new FileBody(filePart);
       MultipartEntity entity = new MultipartEntity();
       entity.addPart("bin", body);
       HttpPost postUpload = new HttpPost(uploadUri);
       postUpload.setEntity(entity);
 
-      Log.d(TAG, "Uploading '" + inputF + "'.");
+      Log.d(TAG, "Uploading '" + filePart + "'.");
       return mClient.request(postUpload, new ResponseHandler<Boolean>() {
             @Override
             public Boolean handleResponse(HttpResponse response)

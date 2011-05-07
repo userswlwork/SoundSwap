@@ -6,9 +6,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -17,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import net.peterd.soundswap.Constants;
-import net.peterd.soundswap.Util;
+import net.peterd.soundswap.Recording;
 import android.accounts.Account;
 import android.content.Context;
 import android.location.Location;
@@ -33,23 +30,21 @@ class Recorder implements Runnable {
   private final AtomicReference<CountDownLatch> mStopLatch =
       new AtomicReference<CountDownLatch>();
 
-  private long mStartTimeMs;
-  private final File mOutputDir;
-  private final List<File> mFileParts =
-      Collections.synchronizedList(new ArrayList<File>());
+  private final Context mContext;
+  private final Account mAccount;
+  private Recording mRecording;
+  private boolean mFinalizedRecording = false;
 
-  public Recorder(File outputDir) {
-    mOutputDir = outputDir;
+  public Recorder(Context context, Account account) {
+    mContext = context;
+    mAccount = account;
   }
 
   private synchronized RandomAccessFile newInitializedFilePart() {
-    int newPartIndex = mFileParts.size();
-    File newPart = new File(mOutputDir,
-        String.format("%d_%d", mStartTimeMs, newPartIndex));
+    File newPart = mRecording.addFilePart(Constants.RECORDING_FILE_EXTENSION);
     try {
       final RandomAccessFile filePart = new RandomAccessFile(newPart, "rw");
       initializeFilePart(filePart);
-      mFileParts.add(newPart);
       return filePart;
     } catch (FileNotFoundException e) {
       // Won't happen; we created the file just now.
@@ -71,7 +66,9 @@ class Recorder implements Runnable {
     // concurrently.
     ExecutorService writeExecutor = Executors.newSingleThreadExecutor();
 
-    mStartTimeMs = System.currentTimeMillis();
+    long startTimeMs = System.currentTimeMillis();
+    mRecording = Recording.newTempRecording(mContext, mAccount, startTimeMs);
+    mRecording.init();
 
     int bufferSize = AudioRecord.getMinBufferSize(
         Constants.RECORDING_SAMPLE_RATE,
@@ -273,32 +270,23 @@ class Recorder implements Runnable {
     mStopLatch.set(latch);
   }
 
-  public List<File> renameTempFiles(Context context, Account account, Location location) {
+  public boolean finalize(Location location) {
     if (location == null) {
       throw new IllegalStateException("Trying to rename temp file without a "
           + "location.");
     }
-
-    List<File> renamedFiles = new ArrayList<File>();
-    for (int partIndex = 0; partIndex < mFileParts.size(); ++partIndex) {
-      File tempFile = mFileParts.get(partIndex);
-      String finalFilename = Util.getRecordedFile(context,
-          account,
-          mStartTimeMs,
-          (int) (location.getLatitude() * 1E6),
-          (int) (location.getLongitude() * 1E6),
-          partIndex);
-      Log.i(TAG, "Renaming '" + tempFile.getAbsolutePath() + "' to '"
-          + finalFilename + "'.");
-      File renamedFile = new File(finalFilename);
-      boolean renamed = tempFile.renameTo(renamedFile);
-      if (renamed) {
-        renamedFiles.add(renamedFile);
-      } else {
-        throw new IllegalStateException("Could not rename file from '"
-            + tempFile.getAbsolutePath() + "' to '" + finalFilename + "'.");
-      }
+    int latE6 = (int) (location.getLatitude() * 1E6);
+    int lonE6 = (int) (location.getLongitude() * 1E6);
+    if (mRecording.moveToRecordedDirectory(latE6, lonE6)) {
+      mFinalizedRecording = true;
     }
-    return renamedFiles;
+    return mFinalizedRecording;
+  }
+
+  public Recording getFinalRecording() {
+    if (!mFinalizedRecording) {
+      throw new IllegalStateException("Haven't finalized the recording yet.");
+    }
+    return mRecording;
   }
 }
